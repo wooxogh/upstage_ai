@@ -19,19 +19,49 @@ SECTION_NAMES = (
 )
 
 
+def _normalize(s: str) -> str:
+    """공백/줄바꿈 정규화 — 따옴표 발췌가 element.text와 줄바꿈/공백만 다를 때 매칭되도록."""
+    return " ".join(s.split())
+
+
 def _find_element_for_quote(
     quote: str, page: int, elements: list[ParsedElement]
 ) -> ParsedElement | None:
-    """page를 우선으로, quote가 element.text에 포함되는 첫 element 반환."""
+    """quote를 element.text에 매칭. 다단계 fallback:
+    1) page 우선 정확 substring
+    2) 전 페이지 정확 substring
+    3) 정규화(공백 통일) 후 substring (양방향)
+    4) quote 앞 20자 앵커가 element.text에 들어있으면 매칭 (LLM이 끝부분을 잘랐을 때)
+    """
     if not quote:
         return None
-    # 같은 페이지부터 검사, 없으면 다른 페이지에서도 검사
+    q = quote.strip()
+
+    # 1) page 우선 정확
     for elem in elements:
-        if elem.page == page and quote in elem.text:
+        if elem.page == page and q in elem.text:
             return elem
+    # 2) 전체 정확
     for elem in elements:
-        if quote in elem.text:
+        if q in elem.text:
             return elem
+
+    # 3) 정규화 후 양방향 substring
+    qn = _normalize(q)
+    if not qn:
+        return None
+    for elem in elements:
+        en = _normalize(elem.text)
+        if qn in en or en in qn:
+            return elem
+
+    # 4) 앵커(앞 20자) 매칭 — LLM이 인용 끝을 잘랐을 때
+    anchor = qn[:20]
+    if len(anchor) >= 8:
+        for elem in elements:
+            if anchor in _normalize(elem.text):
+                return elem
+
     return None
 
 
@@ -98,7 +128,8 @@ async def extract_subscription(
             },
         ],
         "response_format": response_format,
-        "reasoning_effort": "low",
+        "reasoning_effort": "medium",
+        "temperature": 0,  # 추출은 결정론적으로
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]

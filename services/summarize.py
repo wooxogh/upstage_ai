@@ -41,6 +41,7 @@ async def summarize_risks(client: UpstageClient, *, terms: SubscriptionTerms) ->
             },
         ],
         "response_format": {"type": "json_object"},
+        "temperature": 0,
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]
