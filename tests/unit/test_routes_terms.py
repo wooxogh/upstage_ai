@@ -8,7 +8,7 @@ from schemas.subscription import (
     Cancellation, DataUsage, Disputes, FreeTrial, Liability,
     Pricing, SubscriptionTerms, TermsChanges,
 )
-from services.pipeline import AnalysisResult, StageTiming
+from services.pipeline import AnalysisResult, StageTiming, StageUsage
 from services.summarize import KeyClause, KeyClauseCitation
 
 
@@ -49,7 +49,10 @@ def _fake_result() -> AnalysisResult:
                        pain_point_id="MID-02", citation=KeyClauseCitation(page=1, quote="..."))
     return AnalysisResult(
         terms=terms, summary="요약", key_clauses=[clause], ungrounded_clauses=[],
-        grounded=True, timings=[StageTiming(stage="parse", seconds=0.1)],
+        grounded=True,
+        timings=[StageTiming(stage="parse", seconds=0.1)],
+        usage=[StageUsage(stage="parse", calls=1, pages=3),
+               StageUsage(stage="extract", calls=1, prompt_tokens=1000, total_tokens=1500)],
     )
 
 
@@ -72,6 +75,11 @@ def test_analyze_endpoint_happy_path(monkeypatch):
     assert body["grounded"] is True
     assert len(body["key_clauses"]) == 1
     assert body["terms"]["service_name"] == "TestStream"
+    # usage 필드가 timings 옆에 노출되는지
+    assert len(body["usage"]) == 2
+    assert body["usage"][0]["stage"] == "parse"
+    assert body["usage"][0]["pages"] == 3
+    assert body["usage"][1]["total_tokens"] == 1500
 
 
 def test_analyze_endpoint_missing_file_returns_422():

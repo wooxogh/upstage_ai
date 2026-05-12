@@ -17,6 +17,7 @@ class AnalyzeResponse(BaseModel):
     ungrounded_clauses: list[dict]
     grounded: bool
     timings: list[dict]
+    usage: list[dict]
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -42,4 +43,5 @@ async def analyze_terms(
         ungrounded_clauses=[c.model_dump() for c in result.ungrounded_clauses],
         grounded=result.grounded,
         timings=[t.model_dump() for t in result.timings],
+        usage=[u.model_dump() for u in result.usage],
     )

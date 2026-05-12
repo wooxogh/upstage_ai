@@ -29,12 +29,20 @@ class UpstageClient:
             headers={"Authorization": f"Bearer {settings.upstage_api_key}"},
             timeout=timeout_s,
         )
+        # 호출별 usage 누적 — 파이프라인이 단계별로 snapshot_usage()로 빼간다.
+        self._usages: list[dict[str, Any]] = []
 
     async def __aenter__(self) -> "UpstageClient":
         return self
 
     async def __aexit__(self, *exc) -> None:
         await self._client.aclose()
+
+    def snapshot_usage(self) -> list[dict[str, Any]]:
+        """누적된 usage 리스트를 반환하고 내부 버퍼를 비움 (단계 경계용)."""
+        usages = self._usages
+        self._usages = []
+        return usages
 
     async def post_json(self, path: str, *, json: dict[str, Any]) -> dict[str, Any]:
         return await self._request("POST", path, json=json)
@@ -71,12 +79,17 @@ class UpstageClient:
                 # resp.json()이 ValueError를 던질 수 있어 (HTML 오류 페이지, 빈 body 등)
                 # UpstreamResponseError로 명시적 변환 — 도메인 검증 오류와 구분됨.
                 try:
-                    return resp.json()
+                    data = resp.json()
                 except _json.JSONDecodeError as e:
                     raise UpstreamResponseError(
                         f"Upstream returned non-JSON response "
                         f"(status={resp.status_code}, len={len(resp.content)})"
                     ) from e
+                # Upstage는 일반적으로 top-level "usage" 객체 (chat/completions, document-digitization 등)
+                usage = data.get("usage") if isinstance(data, dict) else None
+                if isinstance(usage, dict):
+                    self._usages.append(usage)
+                return data
             except httpx.TransportError as e:
                 last_exc = e
                 await self._backoff_if_more_attempts(attempt, "transport_error")
