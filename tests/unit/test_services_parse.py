@@ -67,3 +67,16 @@ async def test_parse_document_raises_on_empty_response(httpx_mock, settings):
     async with UpstageClient(settings) as client:
         with pytest.raises(ValueError, match="empty"):
             await parse_document(client, file_bytes=b"", filename="empty.pdf")
+
+
+async def test_parse_document_uses_html_mime_for_html_files(httpx_mock, settings):
+    """HTML 파일은 application/pdf가 아닌 text/html로 전송되어야 함."""
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/document-digitization",
+        json={"content": {"markdown": "# Terms"}, "elements": []},
+    )
+    async with UpstageClient(settings) as client:
+        await parse_document(client, file_bytes=b"<html><body>terms</body></html>", filename="terms.html")
+    req = httpx_mock.get_request()
+    body = req.content.decode("utf-8", errors="ignore")
+    assert "text/html" in body

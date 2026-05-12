@@ -46,7 +46,13 @@ async def _check_one(
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]
     data = json.loads(content_str)
-    return bool(data.get("grounded", False)), float(data.get("score", 0.0))
+    # Strict bool 비교 — LLM이 "true"/"false" 문자열을 돌려줘도 ungrounded로 안전하게 처리
+    is_grounded = data.get("grounded") is True
+    try:
+        score = float(data.get("score", 0.0))
+    except (TypeError, ValueError):
+        score = 0.0
+    return is_grounded, score
 
 
 async def check_groundedness(
@@ -64,9 +70,14 @@ async def check_groundedness(
             grounded.append(clause)
         else:
             ungrounded.append(clause)
+    # summary 텍스트도 검증 — clause와 별개로 사용자에게 노출되므로
+    summary_is_grounded, summary_score = await _check_one(
+        client, context=source_markdown, answer=summary.summary
+    )
+    summary_grounded = summary_is_grounded and summary_score >= MIN_SCORE
     return GroundednessResult(
         summary=summary.summary,
         grounded_clauses=grounded,
         ungrounded_clauses=ungrounded,
-        overall_grounded=(len(ungrounded) == 0),
+        overall_grounded=(len(ungrounded) == 0 and summary_grounded),
     )

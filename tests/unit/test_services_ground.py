@@ -36,16 +36,25 @@ def sample_summary():
     )
 
 
+def _grounded_response(grounded: bool, score: float) -> dict:
+    return {"choices": [{"message": {"content": json.dumps({"grounded": grounded, "score": score})}}]}
+
+
 async def test_check_groundedness_filters_ungrounded(httpx_mock, settings, sample_summary):
-    # 첫 호출: grounded
+    # clause 1: grounded
     httpx_mock.add_response(
         url=f"{settings.upstage_base_url}/chat/completions",
-        json={"choices": [{"message": {"content": json.dumps({"grounded": True, "score": 0.95})}}]},
+        json=_grounded_response(True, 0.95),
     )
-    # 두 번째 호출: not grounded
+    # clause 2: not grounded
     httpx_mock.add_response(
         url=f"{settings.upstage_base_url}/chat/completions",
-        json={"choices": [{"message": {"content": json.dumps({"grounded": False, "score": 0.12})}}]},
+        json=_grounded_response(False, 0.12),
+    )
+    # summary: grounded
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json=_grounded_response(True, 0.90),
     )
     async with UpstageClient(settings) as client:
         result = await check_groundedness(
@@ -58,4 +67,60 @@ async def test_check_groundedness_filters_ungrounded(httpx_mock, settings, sampl
     assert result.grounded_clauses[0].title == "자동 갱신"
     assert len(result.ungrounded_clauses) == 1
     assert result.ungrounded_clauses[0].title == "가공의 조항"
+    # 하나라도 ungrounded면 overall_grounded는 False
     assert result.overall_grounded is False
+
+
+async def test_check_groundedness_marks_overall_false_when_summary_ungrounded(
+    httpx_mock, settings, sample_summary
+):
+    """모든 clause가 grounded더라도 summary 자체가 hallucinated면 overall_grounded=False."""
+    # 두 clause 모두 grounded
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json=_grounded_response(True, 0.95),
+    )
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json=_grounded_response(True, 0.90),
+    )
+    # summary: not grounded
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json=_grounded_response(False, 0.15),
+    )
+    async with UpstageClient(settings) as client:
+        result = await check_groundedness(
+            client,
+            summary=sample_summary,
+            source_markdown="원문...",
+        )
+    assert len(result.grounded_clauses) == 2
+    assert len(result.ungrounded_clauses) == 0
+    assert result.overall_grounded is False  # summary가 ungrounded이므로
+
+
+async def test_check_groundedness_strict_bool_rejects_string_true(httpx_mock, settings):
+    """LLM이 '{grounded: "true"}' 같은 문자열을 돌려줘도 ungrounded로 안전 처리."""
+    summary = SummaryResult(
+        summary="요약",
+        key_clauses=[
+            KeyClause(
+                title="t", description="d", risk_level="low",
+                pain_point_id="PRE-01", citation=KeyClauseCitation(page=1, quote="q"),
+            ),
+        ],
+    )
+    # 문자열 "true" 반환 → strict bool 비교에서 ungrounded로 처리되어야 함
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json={"choices": [{"message": {"content": json.dumps({"grounded": "true", "score": 0.99})}}]},
+    )
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json=_grounded_response(True, 0.95),
+    )
+    async with UpstageClient(settings) as client:
+        result = await check_groundedness(client, summary=summary, source_markdown="...")
+    assert len(result.grounded_clauses) == 0
+    assert len(result.ungrounded_clauses) == 1
