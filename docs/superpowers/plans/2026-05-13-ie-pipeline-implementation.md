@@ -4,32 +4,41 @@
 
 **Goal:** OTT/구독 도메인 약관 1건을 입력받아 `Document Parse → Information Extract → Solar Pro 3 요약 → Groundedness Check`까지 종단 동작하는 FastAPI 엔드포인트 구현
 
-**Architecture:** 4개의 Upstage API를 얇은 어댑터(`services/*.py`)로 감싸고, Pydantic v2 스키마(`schemas/subscription.py`)를 contract로 삼아 어댑터들을 직렬로 엮는다. FastAPI 엔드포인트(`/v1/terms/analyze`)는 오케스트레이터(`services/pipeline.py`)를 호출만 한다. 모든 추출 값은 `FieldValue[T]`로 래핑되어 (값, 불확실성, 원문 인용)을 보유한다.
+**Architecture:** 3개의 Upstage API(+1 헬퍼)를 얇은 어댑터(`services/*.py`)로 감싸고, Pydantic v2 스키마(`schemas/subscription.py`)를 contract로 삼아 어댑터들을 직렬로 엮는다. FastAPI 엔드포인트(`/v1/terms/analyze`)는 오케스트레이터(`services/pipeline.py`)를 호출만 한다. 모든 추출 값은 `FieldValue[T]`로 래핑되어 (값, 불확실성, 원문 인용)을 보유한다.
 
 **Tech Stack:** Python 3.12+, FastAPI, Pydantic v2, httpx (async), pytest + pytest-asyncio + pytest-httpx (mock), uv 의존성 관리
+
+**Upstage API 매핑 (공식 docs 검증됨)**
+
+| 단계 | 엔드포인트 | 모델 | 비고 |
+|---|---|---|---|
+| Parse | `POST /document-digitization` | `document-parse` | multipart, `coordinates=true`, 좌표는 0–1 normalized |
+| Extract | `POST /chat/completions` | `solar-pro3` | `response_format.json_schema` 로 nested 지원. IE 전용 API는 root-level object 금지라 부적합 |
+| Summarize | `POST /chat/completions` | `solar-pro3` | `response_format.json_object`, `reasoning_effort` 조정 가능 |
+| Ground | (endpoint TBD) | `solar-pro3` fallback | 공식 docs raw에 미수록 — v1은 Solar chat verification prompt로 대체, 전용 endpoint 발견 시 swap |
 
 **Data Flow:**
 
 ```
-PDF/HTML (multipart or URL)
+PDF/HTML (multipart)
    │
    ▼
-[services/parse.py]       Document Parse API → Markdown + Layout + Coords
+[services/parse.py]       /document-digitization → Markdown + Elements(bbox 0-1)
    │
    ▼
-[services/extract.py]     Information Extract API + JSON Schema → raw JSON
+[services/extract.py]     /chat/completions + json_schema → SubscriptionTerms (citation.quote만)
+   │                      + bbox 후처리: quote ↔ ParsedElement 매칭 → citation.bbox 채움
+   ▼
+SubscriptionTerms         Pydantic instance (validated, bbox enriched)
    │
    ▼
-SubscriptionTerms         Pydantic instance (validated)
+[services/summarize.py]   /chat/completions → 위험 조항 3~5개
    │
    ▼
-[services/summarize.py]   Solar Pro 3 chat → 위험 조항 3~5개 자연어 요약
+[services/ground.py]      Solar chat verification → 미통과 문장 필터
    │
    ▼
-[services/ground.py]      Groundedness Check → 미통과 문장 필터
-   │
-   ▼
-API Response { summary, key_clauses[], citations[], grounded: bool }
+API Response { terms, summary, key_clauses[], grounded, timings[] }
 ```
 
 ---
@@ -1057,7 +1066,7 @@ EOF
 - Create: `services/parse.py`
 - Create: `tests/unit/test_services_parse.py`
 
-Upstage Document Parse: PDF/HTML 입력 → 구조화된 텍스트 + layout + page coordinates.
+Upstage Document Parse (`POST /document-digitization`): PDF/이미지 → markdown + elements(0–1 normalized 좌표).
 
 - [ ] **Step 7.1: 실패 테스트 작성**
 
@@ -1079,35 +1088,38 @@ def settings(sample_api_key, sample_base_url):
 
 async def test_parse_document_returns_structured_result(httpx_mock, settings):
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/document-ai/document-parse",
+        url=f"{settings.upstage_base_url}/document-digitization",
         json={
+            "apiVersion": "1.1",
+            "model": "document-parse-260128",
             "content": {"markdown": "# 이용약관\n\n제1조 (목적)..."},
             "elements": [
                 {
                     "id": 1,
                     "page": 1,
                     "category": "heading1",
-                    "content": {"text": "이용약관"},
+                    "content": {"text": "이용약관", "markdown": "# 이용약관"},
                     "coordinates": [
-                        {"x": 100.0, "y": 50.0},
-                        {"x": 300.0, "y": 50.0},
-                        {"x": 300.0, "y": 80.0},
-                        {"x": 100.0, "y": 80.0},
+                        {"x": 0.125, "y": 0.05},
+                        {"x": 0.425, "y": 0.05},
+                        {"x": 0.425, "y": 0.08},
+                        {"x": 0.125, "y": 0.08},
                     ],
                 },
                 {
                     "id": 2,
                     "page": 1,
                     "category": "paragraph",
-                    "content": {"text": "제1조 (목적)..."},
+                    "content": {"text": "제1조 (목적)...", "markdown": "제1조 (목적)..."},
                     "coordinates": [
-                        {"x": 100.0, "y": 100.0},
-                        {"x": 500.0, "y": 100.0},
-                        {"x": 500.0, "y": 200.0},
-                        {"x": 100.0, "y": 200.0},
+                        {"x": 0.10, "y": 0.10},
+                        {"x": 0.50, "y": 0.10},
+                        {"x": 0.50, "y": 0.20},
+                        {"x": 0.10, "y": 0.20},
                     ],
                 },
             ],
+            "usage": {"pages": 1},
         },
     )
     fake_pdf = io.BytesIO(b"%PDF-1.4 fake content")
@@ -1117,12 +1129,13 @@ async def test_parse_document_returns_structured_result(httpx_mock, settings):
     assert "이용약관" in result.markdown
     assert len(result.elements) == 2
     assert result.elements[0].page == 1
-    assert result.elements[0].bbox == (100.0, 50.0, 300.0, 80.0)
+    # bbox는 0-1 normalized
+    assert result.elements[0].bbox == (0.125, 0.05, 0.425, 0.08)
 
 
 async def test_parse_document_raises_on_empty_response(httpx_mock, settings):
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/document-ai/document-parse",
+        url=f"{settings.upstage_base_url}/document-digitization",
         json={"content": {"markdown": ""}, "elements": []},
     )
     async with UpstageClient(settings) as client:
@@ -1147,7 +1160,8 @@ from pydantic import BaseModel
 
 from services.upstage import UpstageClient
 
-DOCUMENT_PARSE_PATH = "/document-ai/document-parse"
+DOCUMENT_PARSE_PATH = "/document-digitization"
+MODEL = "document-parse"
 
 
 class ParsedElement(BaseModel):
@@ -1155,7 +1169,8 @@ class ParsedElement(BaseModel):
     page: int
     category: str
     text: str
-    bbox: tuple[float, float, float, float] | None  # (x0, y0, x1, y1)
+    # bbox는 0-1 normalized (페이지 width/height 곱해서 pixel로 변환)
+    bbox: tuple[float, float, float, float] | None = None  # (x0, y0, x1, y1)
 
 
 class DocumentParseResult(BaseModel):
@@ -1177,9 +1192,17 @@ async def parse_document(
     file_bytes: bytes,
     filename: str,
 ) -> DocumentParseResult:
-    """Send file to Upstage Document Parse and return structured result."""
+    """Upstage Document Parse 호출 → DocumentParseResult 반환.
+
+    좌표는 0-1 normalized이며 페이지 width/height 곱해서 pixel로 변환 가능.
+    """
     files = {"document": (filename, file_bytes, "application/pdf")}
-    data = {"output_formats": '["markdown"]', "coordinates": "true"}
+    data = {
+        "model": MODEL,
+        "output_formats": '["markdown"]',
+        "coordinates": "true",
+        "ocr": "auto",
+    }
     raw = await client.post_multipart(DOCUMENT_PARSE_PATH, files=files, data=data)
 
     markdown = (raw.get("content") or {}).get("markdown", "")
@@ -1201,8 +1224,6 @@ async def parse_document(
     return DocumentParseResult(markdown=markdown, elements=elements)
 ```
 
-Note: 실제 Upstage Document Parse 응답 키 이름(`content.markdown`, `elements[*].coordinates` 등)은 Upstage 문서를 확인해 미세 조정. 본 구현은 공식 문서 기반 합리적 가정.
-
 - [ ] **Step 7.4: 통과 확인**
 
 ```bash
@@ -1218,10 +1239,10 @@ git add services/parse.py tests/unit/test_services_parse.py
 git commit -m "$(cat <<'EOF'
 feat(services): add Document Parse adapter
 
-Wraps Upstage Document Parse API. Returns DocumentParseResult with
-markdown text + ParsedElement list (page, category, text, bbox).
-Coordinates are normalized to (x0, y0, x1, y1) tuples for downstream
-Citation provenance.
+POST /document-digitization (model=document-parse). Returns
+DocumentParseResult with markdown + ParsedElement list (page,
+category, text, bbox). Coordinates are 0-1 normalized per
+Upstage spec; multiply by page dims for pixel coords downstream.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1230,23 +1251,28 @@ EOF
 
 ---
 
-## Task 8: Information Extraction 어댑터
+## Task 8: 구조화 추출 어댑터 (Solar Pro 3 + json_schema)
 
 **Files:**
 - Create: `prompts/extract_subscription.py`
 - Create: `services/extract.py`
 - Create: `tests/unit/test_services_extract.py`
 
+**전략 변경 사유**: Upstage Information Extract API는 root-level object 및 nested object를 허용하지 않음 (first-level은 scalar/array만, max 100 properties). `SubscriptionTerms`는 7개 nested 섹션을 가지므로 IE API에 직접 못 보냄. 대안으로 **Solar Pro 3 chat completions + `response_format.json_schema`** 사용 — nested 스키마 완전 지원. Document Parse의 element 좌표는 post-processing(`_enrich_with_bbox`)으로 citation에 채워넣음.
+
 - [ ] **Step 8.1: 실패 테스트 작성**
 
 ```python
 # tests/unit/test_services_extract.py
+import json
+
 import pytest
 
 from schemas.common import Uncertainty
 from schemas.enums import BillingCycle, ConsentMechanism
 from schemas.subscription import SubscriptionTerms
 from services.extract import extract_subscription
+from services.parse import ParsedElement
 from services.settings import Settings
 from services.upstage import UpstageClient
 
@@ -1256,9 +1282,13 @@ def settings(sample_api_key, sample_base_url):
     return Settings(upstage_api_key=sample_api_key, upstage_base_url=sample_base_url)
 
 
+def _all_not_specified(field_names: list[str]) -> dict:
+    return {n: {"value": None, "uncertainty": "not_specified", "citation": None} for n in field_names}
+
+
 @pytest.fixture
-def fake_ie_response_payload():
-    """A minimal but valid SubscriptionTerms JSON response."""
+def fake_extract_payload():
+    """Minimal but valid SubscriptionTerms JSON."""
     return {
         "schema_version": "1.0.0",
         "domain": "subscription",
@@ -1266,36 +1296,19 @@ def fake_ie_response_payload():
         "service_provider": "TestCo",
         "extraction_date": "2026-05-13T00:00:00Z",
         "pricing": {
-            "base_price_krw": {
-                "value": 9900,
-                "uncertainty": "confirmed",
-                "citation": {"page": 1, "quote": "월 9,900원"},
-            },
-            "billing_cycle": {
-                "value": "monthly",
-                "uncertainty": "confirmed",
-                "citation": {"page": 1, "quote": "매월"},
-            },
-            "auto_renewal_enabled": {
-                "value": True,
-                "uncertainty": "confirmed",
-                "citation": {"page": 2, "quote": "자동 갱신됩니다"},
-            },
-            "auto_renewal_consent": {
-                "value": "deemed_agreed",
-                "uncertainty": "confirmed",
-                "citation": {"page": 2, "quote": "이의 없으면 동의로 간주", "pain_point_id": "MID-02"},
-            },
-            "price_change_notice_days": {
-                "value": 30,
-                "uncertainty": "confirmed",
-                "citation": {"page": 3, "quote": "30일 전 고지"},
-            },
-            "price_change_notice_channels": {
-                "value": ["email"],
-                "uncertainty": "confirmed",
-                "citation": {"page": 3, "quote": "이메일로 통지"},
-            },
+            "base_price_krw": {"value": 9900, "uncertainty": "confirmed",
+                                "citation": {"page": 1, "quote": "월 9,900원"}},
+            "billing_cycle": {"value": "monthly", "uncertainty": "confirmed",
+                               "citation": {"page": 1, "quote": "매월 결제"}},
+            "auto_renewal_enabled": {"value": True, "uncertainty": "confirmed",
+                                      "citation": {"page": 2, "quote": "자동 갱신됩니다"}},
+            "auto_renewal_consent": {"value": "deemed_agreed", "uncertainty": "confirmed",
+                                      "citation": {"page": 2, "quote": "이의 없으면 동의로 간주",
+                                                    "pain_point_id": "MID-02"}},
+            "price_change_notice_days": {"value": 30, "uncertainty": "confirmed",
+                                          "citation": {"page": 3, "quote": "30일 전 통지"}},
+            "price_change_notice_channels": {"value": ["email"], "uncertainty": "confirmed",
+                                              "citation": {"page": 3, "quote": "이메일로 통지"}},
         },
         "free_trial": _all_not_specified(["offered", "duration_days", "auto_convert_to_paid",
                                            "cancel_required_before_end", "payment_method_required_upfront",
@@ -1320,21 +1333,22 @@ def fake_ie_response_payload():
     }
 
 
-def _all_not_specified(field_names: list[str]) -> dict:
-    return {n: {"value": None, "uncertainty": "not_specified", "citation": None} for n in field_names}
-
-
 async def test_extract_subscription_returns_validated_terms(
-    httpx_mock, settings, fake_ie_response_payload
+    httpx_mock, settings, fake_extract_payload
 ):
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/information-extract",
-        json={"choices": [{"message": {"content": __import__("json").dumps(fake_ie_response_payload)}}]},
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json={"choices": [{"message": {"content": json.dumps(fake_extract_payload)}}]},
     )
+    elements = [
+        ParsedElement(id=1, page=2, category="paragraph",
+                       text="이의 없으면 동의로 간주합니다", bbox=(0.1, 0.2, 0.5, 0.25)),
+    ]
     async with UpstageClient(settings) as client:
         terms = await extract_subscription(
             client,
             parsed_markdown="...",
+            parsed_elements=elements,
             service_name="TestStream",
             service_provider="TestCo",
         )
@@ -1345,17 +1359,20 @@ async def test_extract_subscription_returns_validated_terms(
     assert terms.pricing.auto_renewal_consent.value == ConsentMechanism.DEEMED_AGREED
     assert "의사표시_의제" in terms.unfair_clause_flags
     assert terms.free_trial.offered.uncertainty == Uncertainty.NOT_SPECIFIED
+    # bbox 후처리 검증: auto_renewal_consent의 citation에 bbox가 채워졌어야 함
+    assert terms.pricing.auto_renewal_consent.citation.bbox == (0.1, 0.2, 0.5, 0.25)
 
 
 async def test_extract_subscription_raises_on_invalid_payload(httpx_mock, settings):
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/information-extract",
+        url=f"{settings.upstage_base_url}/chat/completions",
         json={"choices": [{"message": {"content": '{"service_name": "X"}'}}]},
     )
     async with UpstageClient(settings) as client:
         with pytest.raises(ValueError, match="validation"):
             await extract_subscription(
-                client, parsed_markdown="...", service_name="X", service_provider="Y"
+                client, parsed_markdown="...", parsed_elements=[],
+                service_name="X", service_provider="Y"
             )
 ```
 
@@ -1382,21 +1399,19 @@ SYSTEM_PROMPT = """\
    - "inferred": 다른 조항에서 유추됨
    - "ambiguous": 다중 해석 가능
    - "not_specified": 약관이 침묵
-4. citation: value가 null이 아니면 page + quote 필수. 가능하면 section, bbox, pain_point_id 포함.
-5. quote는 약관 원문 그대로 발췌 (변형/요약 금지).
-6. 의사표시 의제(무응답 = 동의) 조항을 발견하면:
-   - 해당 ConsentMechanism 필드를 "deemed_agreed"로
+4. citation: value가 null이 아니면 page + quote 필수. quote는 약관 원문 그대로 발췌 (변형/요약 금지). bbox/section은 채우지 말 것 — 후처리에서 채워짐. pain_point_id는 해당하는 ID가 명확할 때만 (PRE-01..04, MID-01..02, POST-01..05).
+5. 의사표시 의제(무응답 = 동의) 조항을 발견하면:
+   - 해당 ConsentMechanism 필드를 "deemed_agreed"
    - unfair_clause_flags 에 "의사표시_의제" 추가
-
-스키마는 user 메시지에 첨부됩니다.
+6. 응답은 SubscriptionTerms JSON 객체 하나 (response_format=json_schema 강제).
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관을 분석해 SubscriptionTerms JSON을 생성하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요.
 
 서비스: {service_name} ({service_provider})
 
-약관 본문:
+약관 본문 (Document Parse markdown 결과):
 ---
 {parsed_markdown}
 ---
@@ -1414,21 +1429,77 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from prompts.extract_subscription import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
+from schemas.common import Citation, FieldValue
 from schemas.subscription import SubscriptionTerms
+from services.parse import ParsedElement
 from services.upstage import UpstageClient
 
-INFORMATION_EXTRACT_PATH = "/information-extract"
-MODEL = "information-extract"
+CHAT_COMPLETIONS_PATH = "/chat/completions"
+MODEL = "solar-pro3"
+SECTION_NAMES = (
+    "pricing", "free_trial", "cancellation", "terms_changes",
+    "data_usage", "liability", "disputes",
+)
+
+
+def _find_element_for_quote(
+    quote: str, page: int, elements: list[ParsedElement]
+) -> ParsedElement | None:
+    """page를 우선으로, quote가 element.text에 포함되는 첫 element 반환."""
+    if not quote:
+        return None
+    # 같은 페이지부터 검사, 없으면 다른 페이지에서도 검사
+    for elem in elements:
+        if elem.page == page and quote in elem.text:
+            return elem
+    for elem in elements:
+        if quote in elem.text:
+            return elem
+    return None
+
+
+def _enrich_citation(
+    citation: Citation | None, elements: list[ParsedElement]
+) -> Citation | None:
+    if citation is None or citation.bbox is not None:
+        return citation
+    elem = _find_element_for_quote(citation.quote, citation.page, elements)
+    if elem is None:
+        return citation
+    updates: dict = {"bbox": elem.bbox}
+    if citation.section is None:
+        updates["section"] = elem.category
+    return citation.model_copy(update=updates)
+
+
+def _enrich_with_bbox(
+    terms: SubscriptionTerms, elements: list[ParsedElement]
+) -> SubscriptionTerms:
+    """각 섹션의 모든 FieldValue에 대해 citation.bbox를 element 매칭으로 채움."""
+    for section_name in SECTION_NAMES:
+        section = getattr(terms, section_name)
+        for field_name in section.__class__.model_fields:
+            fv: FieldValue = getattr(section, field_name)
+            new_citation = _enrich_citation(fv.citation, elements)
+            if new_citation is not fv.citation:
+                # Pydantic v2 모델은 immutable이 아니므로 직접 할당 가능
+                fv.citation = new_citation
+    return terms
 
 
 async def extract_subscription(
     client: UpstageClient,
     *,
     parsed_markdown: str,
+    parsed_elements: list[ParsedElement],
     service_name: str,
     service_provider: str,
 ) -> SubscriptionTerms:
-    """Call Upstage Information Extract with SubscriptionTerms schema."""
+    """Solar Pro 3 chat completions + json_schema로 SubscriptionTerms 추출.
+
+    Information Extract API는 nested 스키마 미지원이라 chat completions 사용.
+    citation.bbox는 Document Parse elements와 quote 매칭으로 후처리에서 채워짐.
+    """
     response_format = {
         "type": "json_schema",
         "json_schema": {
@@ -1451,20 +1522,20 @@ async def extract_subscription(
             },
         ],
         "response_format": response_format,
+        "reasoning_effort": "low",
     }
-    raw = await client.post_json(INFORMATION_EXTRACT_PATH, json=payload)
+    raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]
     parsed = json.loads(content_str)
     parsed.setdefault("extraction_date", datetime.now(timezone.utc).isoformat())
     parsed.setdefault("service_name", service_name)
     parsed.setdefault("service_provider", service_provider)
     try:
-        return SubscriptionTerms.model_validate(parsed)
+        terms = SubscriptionTerms.model_validate(parsed)
     except ValidationError as e:
-        raise ValueError(f"IE response validation failed: {e}") from e
+        raise ValueError(f"Extract response validation failed: {e}") from e
+    return _enrich_with_bbox(terms, parsed_elements)
 ```
-
-Note: 실제 Upstage Information Extract API의 정확한 endpoint/payload shape는 공식 문서 확인 필요. 본 구현은 OpenAI chat completions 스타일을 차용한 합리적 추정.
 
 - [ ] **Step 8.5: 통과 확인**
 
@@ -1479,12 +1550,13 @@ Expected: `2 passed`.
 ```bash
 git add prompts/extract_subscription.py services/extract.py tests/unit/test_services_extract.py
 git commit -m "$(cat <<'EOF'
-feat(services): add Information Extract adapter
+feat(services): add structured extraction via Solar Pro 3 + json_schema
 
-Calls Upstage IE API with SubscriptionTerms JSON schema. Validates
-response into Pydantic instance. Prompt instructs LLM to fill
-FieldValue (value, uncertainty, citation) for every field and to
-flag 의사표시 의제 as unfair clause.
+Upstage Information Extract API doesn't support nested object schemas
+(first-level scalar/array only); we use Solar Pro 3 chat completions
+with response_format=json_schema instead. SubscriptionTerms is validated
+into a Pydantic instance, then _enrich_with_bbox matches each citation
+quote against Document Parse elements to fill in bbox + section.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1658,7 +1730,7 @@ from schemas.subscription import SubscriptionTerms
 from services.upstage import UpstageClient
 
 CHAT_COMPLETIONS_PATH = "/chat/completions"
-MODEL = "solar-pro-3"
+MODEL = "solar-pro3"  # Upstage 공식 alias: solar-pro3 → solar-pro3-260323
 
 
 class KeyClauseCitation(BaseModel):
@@ -1724,16 +1796,21 @@ EOF
 
 ---
 
-## Task 10: Groundedness Check 어댑터
+## Task 10: Groundedness Check 어댑터 (Solar chat fallback)
 
 **Files:**
+- Create: `prompts/groundedness_check.py`
 - Create: `services/ground.py`
 - Create: `tests/unit/test_services_ground.py`
+
+**전략**: Upstage 공식 docs raw에 전용 `/groundedness-check` 엔드포인트가 수록되지 않았다 (Chat/Embeddings/Document Parse/IE만 명시). v1은 Solar Pro 3 chat completions로 verification prompt를 보내 `{grounded: bool, score: float}` JSON 응답을 받는 **fallback 구현**. 전용 endpoint가 확인되면 Step 10.6에서 swap.
 
 - [ ] **Step 10.1: 실패 테스트 작성**
 
 ```python
 # tests/unit/test_services_ground.py
+import json
+
 import pytest
 
 from services.ground import GroundednessResult, check_groundedness
@@ -1771,13 +1848,15 @@ def sample_summary():
 
 
 async def test_check_groundedness_filters_ungrounded(httpx_mock, settings, sample_summary):
+    # 첫 호출: grounded
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/groundedness-check",
-        json={"grounded": True, "score": 0.95},
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json={"choices": [{"message": {"content": json.dumps({"grounded": True, "score": 0.95})}}]},
     )
+    # 두 번째 호출: not grounded
     httpx_mock.add_response(
-        url=f"{settings.upstage_base_url}/groundedness-check",
-        json={"grounded": False, "score": 0.12},
+        url=f"{settings.upstage_base_url}/chat/completions",
+        json={"choices": [{"message": {"content": json.dumps({"grounded": False, "score": 0.12})}}]},
     )
     async with UpstageClient(settings) as client:
         result = await check_groundedness(
@@ -1790,7 +1869,7 @@ async def test_check_groundedness_filters_ungrounded(httpx_mock, settings, sampl
     assert result.grounded_clauses[0].title == "자동 갱신"
     assert len(result.ungrounded_clauses) == 1
     assert result.ungrounded_clauses[0].title == "가공의 조항"
-    assert result.overall_grounded is False  # any ungrounded -> overall false
+    assert result.overall_grounded is False
 ```
 
 - [ ] **Step 10.2: 실패 확인**
@@ -1801,17 +1880,50 @@ pytest tests/unit/test_services_ground.py -v
 
 Expected: `ImportError`.
 
-- [ ] **Step 10.3: `services/ground.py` 구현**
+- [ ] **Step 10.3: `prompts/groundedness_check.py` 작성**
+
+```python
+SYSTEM_PROMPT = """\
+당신은 응답 검증자입니다. 주어진 '원문 컨텍스트'와 '응답 문장'을 비교해
+응답이 원문에 의해 뒷받침되는지(grounded) 판정하세요.
+
+규칙:
+1. 응답이 원문에 직접/간접적으로 명시되어 있으면 grounded=true.
+2. 원문에 없는 내용이거나 원문과 모순되면 grounded=false.
+3. score: 0.0 (전혀 근거 없음) ~ 1.0 (완전한 근거) 사이 float.
+4. 출력은 JSON 객체 하나: { "grounded": bool, "score": float }
+"""
+
+USER_PROMPT_TEMPLATE = """\
+원문 컨텍스트:
+---
+{context}
+---
+
+검증할 응답 문장:
+---
+{answer}
+---
+
+위 응답이 원문에 의해 뒷받침됩니까?
+"""
+```
+
+- [ ] **Step 10.4: `services/ground.py` 구현**
 
 ```python
 from __future__ import annotations
 
+import json
+
 from pydantic import BaseModel, Field
 
+from prompts.groundedness_check import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
 from services.summarize import KeyClause, SummaryResult
 from services.upstage import UpstageClient
 
-GROUNDEDNESS_PATH = "/groundedness-check"
+CHAT_COMPLETIONS_PATH = "/chat/completions"
+MODEL = "solar-pro3"
 MIN_SCORE = 0.7
 
 
@@ -1828,9 +1940,23 @@ async def _check_one(
     context: str,
     answer: str,
 ) -> tuple[bool, float]:
-    payload = {"context": context, "answer": answer}
-    raw = await client.post_json(GROUNDEDNESS_PATH, json=payload)
-    return bool(raw.get("grounded", False)), float(raw.get("score", 0.0))
+    """Solar Pro 3 chat completions으로 verification (전용 endpoint 미수록 fallback)."""
+    payload = {
+        "model": MODEL,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": USER_PROMPT_TEMPLATE.format(context=context, answer=answer),
+            },
+        ],
+        "response_format": {"type": "json_object"},
+        "reasoning_effort": "low",
+    }
+    raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
+    content_str = raw["choices"][0]["message"]["content"]
+    data = json.loads(content_str)
+    return bool(data.get("grounded", False)), float(data.get("score", 0.0))
 
 
 async def check_groundedness(
@@ -1856,7 +1982,7 @@ async def check_groundedness(
     )
 ```
 
-- [ ] **Step 10.4: 통과 확인**
+- [ ] **Step 10.5: 통과 확인**
 
 ```bash
 pytest tests/unit/test_services_ground.py -v
@@ -1864,17 +1990,30 @@ pytest tests/unit/test_services_ground.py -v
 
 Expected: `1 passed`.
 
-- [ ] **Step 10.5: 커밋**
+- [ ] **Step 10.6: TODO 주석 — 전용 endpoint swap 지점**
+
+`services/ground.py` 최상단에 다음 주석 추가:
+
+```python
+# TODO(groundedness): Upstage 전용 /groundedness-check endpoint가 공식 문서에 추가되면
+# CHAT_COMPLETIONS_PATH → 전용 path로 swap, payload를 {context, answer} 단순 형태로 변경.
+# 현재는 Solar Pro 3 chat에 verification prompt 보내는 fallback 구현.
+```
+
+- [ ] **Step 10.7: 커밋**
 
 ```bash
-git add services/ground.py tests/unit/test_services_ground.py
+git add prompts/groundedness_check.py services/ground.py tests/unit/test_services_ground.py
 git commit -m "$(cat <<'EOF'
-feat(services): add Groundedness Check adapter
+feat(services): add groundedness check (Solar chat fallback)
 
-Verifies each KeyClause from SummaryResult against the source
-markdown via Upstage Groundedness Check API. Clauses scoring below
-MIN_SCORE (0.7) or marked not-grounded are returned in
+Upstage's dedicated /groundedness-check endpoint isn't documented in
+the for-agents API spec, so v1 uses Solar Pro 3 chat completions with
+a verification prompt returning {grounded: bool, score: float}.
+Clauses below MIN_SCORE=0.7 or marked not-grounded are routed to
 ungrounded_clauses; overall_grounded is True only if all pass.
+
+TODO: swap endpoint when dedicated API surfaces.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 EOF
@@ -1963,7 +2102,7 @@ async def test_run_pipeline_invokes_each_stage_in_order(monkeypatch):
         call_order.append("parse")
         return parse_result
 
-    async def fake_extract(client, *, parsed_markdown, service_name, service_provider):
+    async def fake_extract(client, *, parsed_markdown, parsed_elements, service_name, service_provider):
         call_order.append("extract")
         return terms
 
@@ -2056,6 +2195,7 @@ async def run_pipeline(
     terms = await extract_subscription(
         client,
         parsed_markdown=parsed.markdown,
+        parsed_elements=parsed.elements,
         service_name=service_name,
         service_provider=service_provider,
     )
