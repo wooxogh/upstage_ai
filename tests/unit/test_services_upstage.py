@@ -2,7 +2,7 @@ import httpx
 import pytest
 
 from services.settings import Settings
-from services.upstage import UpstageClient
+from services.upstage import UpstageClient, UpstreamResponseError
 
 
 @pytest.fixture
@@ -41,3 +41,35 @@ async def test_client_raises_on_4xx(httpx_mock, settings):
     async with UpstageClient(settings) as client:
         with pytest.raises(httpx.HTTPStatusError):
             await client.post_json("/bad", json={})
+
+
+async def test_client_raises_upstream_response_error_on_non_json(httpx_mock, settings):
+    """200이지만 응답이 JSON이 아니면 UpstreamResponseError (도메인 검증 오류 아님)."""
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/html",
+        status_code=200,
+        content=b"<html><body>service unavailable</body></html>",
+        headers={"Content-Type": "text/html"},
+    )
+    async with UpstageClient(settings) as client:
+        with pytest.raises(UpstreamResponseError, match="non-JSON"):
+            await client.post_json("/html", json={})
+
+
+async def test_retry_does_not_sleep_after_final_attempt(httpx_mock, settings, monkeypatch):
+    """3번 다 5xx 실패 시 sleep은 2번만 (시도 1과 2 사이, 2와 3 사이). 3번째 후 즉시 raise."""
+    httpx_mock.add_response(status_code=503, url=f"{settings.upstage_base_url}/fail", is_reusable=True)
+
+    sleep_calls: list[float] = []
+
+    async def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr("services.upstage.asyncio.sleep", fake_sleep)
+
+    async with UpstageClient(settings) as client:
+        with pytest.raises(httpx.HTTPStatusError):
+            await client.post_json("/fail", json={})
+    # MAX_RETRIES=3 → 첫 시도와 두 번째 시도 후에만 sleep, 마지막 시도 후엔 sleep 없이 즉시 raise
+    assert len(sleep_calls) == 2
+    assert sleep_calls == [0.5, 1.0]  # 0.5 * 2^0, 0.5 * 2^1

@@ -11,6 +11,13 @@ from schemas.subscription import SubscriptionTerms
 from services.parse import ParsedElement
 from services.upstage import UpstageClient
 
+
+class SchemaValidationError(ValueError):
+    """추출된 응답이 SubscriptionTerms 스키마에 맞지 않을 때.
+
+    ValueError를 상속해 기존 `pytest.raises(ValueError, match="validation")` 호환.
+    """
+
 CHAT_COMPLETIONS_PATH = "/chat/completions"
 MODEL = "solar-pro3"
 SECTION_NAMES = (
@@ -140,5 +147,5 @@ async def extract_subscription(
     try:
         terms = SubscriptionTerms.model_validate(parsed)
     except ValidationError as e:
-        raise ValueError(f"Extract response validation failed: {e}") from e
+        raise SchemaValidationError(f"Extract response validation failed: {e}") from e
     return _enrich_with_bbox(terms, parsed_elements)
