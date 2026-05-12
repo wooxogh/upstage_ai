@@ -12,3 +12,7 @@ build/
 .coverage
 htmlcov/
 .DS_Store
+
+# E2E fixture binaries (real terms documents)
+data/fixtures/*.pdf
+data/fixtures/*.html

@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel
 
 from services.pipeline import AnalysisResult, run_pipeline
-from services.settings import Settings
+from services.settings import Settings, get_settings
 from services.upstage import UpstageClient
 
 router = APIRouter(prefix="/v1/terms", tags=["terms"])
@@ -24,9 +24,9 @@ async def analyze_terms(
     file: UploadFile = File(...),
     service_name: str = Form(...),
     service_provider: str = Form(...),
+    settings: Settings = Depends(get_settings),
 ) -> AnalyzeResponse:
     file_bytes = await file.read()
-    settings = Settings()  # loads from .env
     async with UpstageClient(settings) as client:
         result: AnalysisResult = await run_pipeline(
             client,
