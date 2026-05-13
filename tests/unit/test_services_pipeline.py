@@ -94,7 +94,7 @@ async def test_run_pipeline_invokes_each_stage_in_order(monkeypatch):
         return ground
 
     monkeypatch.setattr("services.pipeline.parse_document", fake_parse)
-    monkeypatch.setattr("services.pipeline.extract_subscription", fake_extract)
+    monkeypatch.setattr("services.pipeline.extract_subscription_with_voting", fake_extract)
     monkeypatch.setattr("services.pipeline.summarize_risks", fake_summarize)
     monkeypatch.setattr("services.pipeline.check_groundedness", fake_ground)
 
@@ -136,7 +136,7 @@ async def test_run_pipeline_aggregates_token_usage_per_stage(monkeypatch):
     async def fake_ground(client, *, summary, source_markdown): return ground
 
     monkeypatch.setattr("services.pipeline.parse_document", fake_parse)
-    monkeypatch.setattr("services.pipeline.extract_subscription", fake_extract)
+    monkeypatch.setattr("services.pipeline.extract_subscription_with_voting", fake_extract)
     monkeypatch.setattr("services.pipeline.summarize_risks", fake_summarize)
     monkeypatch.setattr("services.pipeline.check_groundedness", fake_ground)
 

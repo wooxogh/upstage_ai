@@ -7,7 +7,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from schemas.subscription import SubscriptionTerms
-from services.extract import extract_subscription
+from services.extract import extract_subscription_with_voting
 from services.ground import check_groundedness
 from services.parse import parse_document
 from services.summarize import KeyClause, summarize_risks
@@ -75,7 +75,7 @@ async def run_pipeline(
     usage.append(_aggregate_usages("parse", client.snapshot_usage()))
 
     t0 = time.perf_counter()
-    terms = await extract_subscription(
+    terms = await extract_subscription_with_voting(
         client,
         parsed_markdown=parsed.markdown,
         parsed_elements=parsed.elements,

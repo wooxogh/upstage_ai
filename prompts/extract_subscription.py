@@ -18,9 +18,18 @@ SYSTEM_PROMPT = """\
    - MID-01 (형식적 고지), MID-02 (의사표시 의제)
    - POST-01 (위약금 미인지), POST-02 (해지 절차 복잡), POST-03 (보장/혜택 미인지), POST-04 (면책/손배 제한), POST-05 (분쟁/집단소송 포기)
    ⚠️ "PRE-XX", "MID-XX" 같은 placeholder는 절대 출력하지 말 것. 위 11개 중 하나 또는 null만 허용.
-5. 의사표시 의제(무응답 = 동의) 조항을 발견하면:
+5. **ConsentMechanism 판정 기준 (자주 헷갈리는 필드 — 다음 결정 흐름을 순서대로 엄격 적용)**:
+   ① 약관에 "이의 없으면 동의로 간주", "이의 제기 없을 시 승낙한 것으로 본다" 같은
+      **명시적 침묵-간주 문구**가 있는가? → "deemed_agreed"
+   ② 사용자가 가입 시 또는 변경 시 **체크박스/"동의" 버튼/별도 동의 단계**를 거쳐야 하는가? → "opt_in_explicit"
+   ③ 위 둘 다 해당 없고, 사용자가 단순히 서비스 이용을 통해 묵시적 동의하며,
+      서비스 해지/거부 액션이 가능한가? → "opt_out_available"
+   기본값(애매하면): 변경 고지 + 시간 경과 후 자동 적용 = "deemed_agreed", 일반 구독 자동갱신 = "opt_out_available"
+
+   "deemed_agreed"가 발견되면:
    - 해당 ConsentMechanism 필드를 "deemed_agreed"
    - unfair_clause_flags 에 "의사표시_의제" 추가
+
 6. 응답은 SubscriptionTerms JSON 객체 하나 (response_format=json_schema 강제).
 """
 
