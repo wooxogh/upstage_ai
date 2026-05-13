@@ -12,6 +12,14 @@ SYSTEM_PROMPT = """\
    - "inferred": 다른 조항이나 일반 관행에서 합리적으로 유추됨 (page + quote 필수, quote는 유추 근거)
    - "ambiguous": 다중 해석 가능 (page + quote 필수)
    - "not_specified": 약관이 침묵 (citation은 null 가능)
+   ⚠️ **명시적 부재 vs 침묵 — 가장 자주 혼동되는 구분**:
+   - 약관이 "X를 제공하지 않습니다", "X는 없습니다", "X는 적용되지 않습니다", "X 의무가 없습니다" 같이
+     **부재/부정을 명시적으로 표현**하면 → value=False (또는 0, [], "") + uncertainty="confirmed" + citation 필수.
+   - "not_specified"는 약관 본문에 그 주제에 대한 언급 자체가 없을 때만 사용.
+   - 예: "위약금이 부과되지 않습니다" → penalty_present=False, "confirmed" (NOT "not_specified")
+   - 예: "보상 의무를 부담하지 않습니다" → service_disruption_compensation=False, "confirmed"
+   - 예: "집단소송에 대해 약관에 언급 없음" → class_action_waiver는 "not_specified"
+   - 예: "본 약관은 집단소송 권리를 제한하지 않습니다" → class_action_waiver=False, "confirmed"
 4. **citation 의무**: value가 null이 아니거나 uncertainty가 "confirmed"/"inferred"/"ambiguous" 면 citation 필수 (page + 원문 quote). quote는 약관 원문에서 직접 발췌한 10~80자 문자열 (변형/요약 금지). 절대 빈 문자열("")이나 "..." placeholder를 quote에 넣지 말 것. bbox/section은 채우지 말 것 — 후처리에서 채워짐.
    pain_point_id는 다음 11개 중 정확히 하나만 사용 (해당 없으면 null):
    - PRE-01 (분량/난이도 압박), PRE-02 (혜택-약관 괴리), PRE-03 (무료체험→자동전환), PRE-04 (개인정보 활용)
@@ -54,11 +62,21 @@ SYSTEM_PROMPT = """\
 판정:
 - cancellation.penalty_present.value = False, uncertainty="confirmed", citation.quote="해지 시 별도의 위약금이 부과되지 않습니다"
 
+## 사례 D — 명시적 부재 (분쟁/면책 영역, 자주 빠뜨림)
+입력 발췌: "본 약관은 강행규정에 반하는 방식으로 소비자의 권리(소송권 포함)를 제한하지 않습니다. 중재 의무는 없습니다."
+판정:
+- disputes.arbitration_required.value = False, uncertainty="confirmed", citation.quote="중재 의무는 없습니다"
+- disputes.class_action_waiver.value = False, uncertainty="confirmed", citation.quote="...소송권 포함...제한하지 않습니다"
+- liability.service_disruption_compensation 약관에 보상 의무 명시 부재 표현이 있으면 동일하게 False/"confirmed"
+
+판단 룰: **"~하지 않습니다", "없습니다", "제한하지 않습니다", "의무가 없습니다"** 등 **부정·부재의 명시적 진술**이 있으면 그 사실 자체가 confirmed 정보. not_specified로 빠지면 안 됨.
+
 위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C 판정 기준을 적용하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D 판정 기준을 적용하세요.
+특히 사례 D (명시적 부재 vs 침묵 구분)을 약관 전체에 일관되게 적용하세요.
 
 서비스: {service_name} ({service_provider})
 

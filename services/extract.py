@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 
 from pydantic import ValidationError
@@ -20,7 +21,10 @@ class SchemaValidationError(ValueError):
     """
 
 
-ENSEMBLE_N = 3  # N=3 majority voting
+ENSEMBLE_N = int(os.getenv("EXTRACT_ENSEMBLE_N", "3"))  # N=3 majority voting (env override 가능)
+# Default: "medium" — 2026-05-14 실험에서 medium+N3 (67.5%) 이 high+N3 (61.5%) 보다 우수.
+# high는 reasoning 경로가 너무 다양해 voting이 깎이고, medium은 일관성 있어 voting이 noise 평균화.
+REASONING_EFFORT = os.getenv("EXTRACT_REASONING_EFFORT", "medium")
 
 CHAT_COMPLETIONS_PATH = "/chat/completions"
 MODEL = "solar-pro3"
@@ -139,7 +143,7 @@ async def extract_subscription(
             },
         ],
         "response_format": response_format,
-        "reasoning_effort": "high",  # 도메인 추출은 더 신중한 reasoning 필요
+        "reasoning_effort": REASONING_EFFORT,  # env로 조절 (실험용)
         "temperature": 0,  # 추출은 결정론적으로 (Solar는 완전 결정적이진 않지만 variance 최소화)
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
