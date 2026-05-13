@@ -18,14 +18,47 @@ SYSTEM_PROMPT = """\
    - MID-01 (형식적 고지), MID-02 (의사표시 의제)
    - POST-01 (위약금 미인지), POST-02 (해지 절차 복잡), POST-03 (보장/혜택 미인지), POST-04 (면책/손배 제한), POST-05 (분쟁/집단소송 포기)
    ⚠️ "PRE-XX", "MID-XX" 같은 placeholder는 절대 출력하지 말 것. 위 11개 중 하나 또는 null만 허용.
-5. 의사표시 의제(무응답 = 동의) 조항을 발견하면:
+5. **ConsentMechanism 판정 기준 (자주 헷갈리는 필드 — 다음 결정 흐름을 순서대로 엄격 적용)**:
+   ① 약관에 "이의 없으면 동의로 간주", "이의 제기 없을 시 승낙한 것으로 본다" 같은
+      **명시적 침묵-간주 문구**가 있는가? → "deemed_agreed"
+   ② 사용자가 가입 시 또는 변경 시 **체크박스/"동의" 버튼/별도 동의 단계**를 거쳐야 하는가? → "opt_in_explicit"
+   ③ 위 둘 다 해당 없고, 사용자가 단순히 서비스 이용을 통해 묵시적 동의하며,
+      서비스 해지/거부 액션이 가능한가? → "opt_out_available"
+   기본값(애매하면): 변경 고지 + 시간 경과 후 자동 적용 = "deemed_agreed", 일반 구독 자동갱신 = "opt_out_available"
+
+   "deemed_agreed"가 발견되면:
    - 해당 ConsentMechanism 필드를 "deemed_agreed"
    - unfair_clause_flags 에 "의사표시_의제" 추가
+
 6. 응답은 SubscriptionTerms JSON 객체 하나 (response_format=json_schema 강제).
+
+# === 판정 사례 (참고용) ===
+
+## 사례 A — 약관 변경: 침묵-간주 패턴
+입력 발췌: "사업자는 약관 변경 30일 전 통지하며, 통지 기간 내 이의를 제기하지 아니한 경우 변경에 동의한 것으로 본다."
+판정:
+- terms_changes.notice_lead_time_days.value = 30, uncertainty="confirmed", citation.quote="...30일 전 통지하며..."
+- terms_changes.user_consent_mechanism.value = "deemed_agreed"  ← "동의한 것으로 본다" 명시
+- terms_changes.silent_acceptance_clause.value = True
+- unfair_clause_flags 에 "의사표시_의제" 추가
+
+## 사례 B — 자동 갱신: 거부 통로 있음
+입력 발췌: "구독은 결제 주기 종료일에 자동으로 갱신됩니다. 사용자는 결제일 전까지 ‘계정’ 페이지에서 해지하여 다음 갱신을 막을 수 있습니다."
+판정:
+- pricing.auto_renewal_enabled.value = True, citation.quote="...자동으로 갱신됩니다..."
+- pricing.auto_renewal_consent.value = "opt_out_available"  ← 해지 액션으로 거부 가능, "동의 간주" 표현 없음
+- cancellation.method.value = "online"
+
+## 사례 C — 위약금: 명시적 부재
+입력 발췌: "해지 시 별도의 위약금이 부과되지 않습니다."
+판정:
+- cancellation.penalty_present.value = False, uncertainty="confirmed", citation.quote="해지 시 별도의 위약금이 부과되지 않습니다"
+
+위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C 판정 기준을 적용하세요.
 
 서비스: {service_name} ({service_provider})
 

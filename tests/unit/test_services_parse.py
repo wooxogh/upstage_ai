@@ -80,3 +80,19 @@ async def test_parse_document_uses_html_mime_for_html_files(httpx_mock, settings
     req = httpx_mock.get_request()
     body = req.content.decode("utf-8", errors="ignore")
     assert "text/html" in body
+
+
+async def test_parse_document_mode_parameter_passes_through(httpx_mock, settings):
+    """mode 인자가 multipart form data에 그대로 전달되어야 함 (운영 비용 조절 가능)."""
+    httpx_mock.add_response(
+        url=f"{settings.upstage_base_url}/document-digitization",
+        json={"content": {"markdown": "# t"}, "elements": []},
+    )
+    async with UpstageClient(settings) as client:
+        await parse_document(client, file_bytes=b"%PDF", filename="t.pdf", mode="standard")
+    req = httpx_mock.get_request()
+    body = req.content.decode("utf-8", errors="ignore")
+    assert 'name="mode"' in body
+    # form-data part 형식: name="mode"\r\n\r\nstandard
+    assert "standard" in body
+    assert "enhanced" not in body

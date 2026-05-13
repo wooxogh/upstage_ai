@@ -10,6 +10,7 @@ from schemas.common import Citation, FieldValue
 from schemas.subscription import SubscriptionTerms
 from services.parse import ParsedElement
 from services.upstage import UpstageClient
+from services.voting import vote_subscription_terms
 
 
 class SchemaValidationError(ValueError):
@@ -17,6 +18,9 @@ class SchemaValidationError(ValueError):
 
     ValueError를 상속해 기존 `pytest.raises(ValueError, match="validation")` 호환.
     """
+
+
+ENSEMBLE_N = 3  # N=3 majority voting
 
 CHAT_COMPLETIONS_PATH = "/chat/completions"
 MODEL = "solar-pro3"
@@ -135,8 +139,8 @@ async def extract_subscription(
             },
         ],
         "response_format": response_format,
-        "reasoning_effort": "medium",
-        "temperature": 0,  # 추출은 결정론적으로
+        "reasoning_effort": "high",  # 도메인 추출은 더 신중한 reasoning 필요
+        "temperature": 0,  # 추출은 결정론적으로 (Solar는 완전 결정적이진 않지만 variance 최소화)
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]
@@ -149,3 +153,41 @@ async def extract_subscription(
     except ValidationError as e:
         raise SchemaValidationError(f"Extract response validation failed: {e}") from e
     return _enrich_with_bbox(terms, parsed_elements)
+
+
+async def extract_subscription_with_voting(
+    client: UpstageClient,
+    *,
+    parsed_markdown: str,
+    parsed_elements: list[ParsedElement],
+    service_name: str,
+    service_provider: str,
+    n: int = ENSEMBLE_N,
+) -> SubscriptionTerms:
+    """N회 sequential extract → majority voting.
+
+    병렬은 Upstage 429 rate limit에 걸려 순차 호출. n=1이면 voting 생략.
+    citation은 winning value를 가진 run에서 가져오므로 bbox 보존됨.
+    """
+    if n < 1:
+        raise ValueError(f"n must be >= 1, got {n}")
+    if n == 1:
+        return await extract_subscription(
+            client,
+            parsed_markdown=parsed_markdown,
+            parsed_elements=parsed_elements,
+            service_name=service_name,
+            service_provider=service_provider,
+        )
+
+    runs: list[SubscriptionTerms] = []
+    for _ in range(n):
+        terms = await extract_subscription(
+            client,
+            parsed_markdown=parsed_markdown,
+            parsed_elements=parsed_elements,
+            service_name=service_name,
+            service_provider=service_provider,
+        )
+        runs.append(terms)
+    return vote_subscription_terms(runs)
