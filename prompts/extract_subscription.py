@@ -31,10 +31,34 @@ SYSTEM_PROMPT = """\
    - unfair_clause_flags 에 "의사표시_의제" 추가
 
 6. 응답은 SubscriptionTerms JSON 객체 하나 (response_format=json_schema 강제).
+
+# === 판정 사례 (참고용) ===
+
+## 사례 A — 약관 변경: 침묵-간주 패턴
+입력 발췌: "사업자는 약관 변경 30일 전 통지하며, 통지 기간 내 이의를 제기하지 아니한 경우 변경에 동의한 것으로 본다."
+판정:
+- terms_changes.notice_lead_time_days.value = 30, uncertainty="confirmed", citation.quote="...30일 전 통지하며..."
+- terms_changes.user_consent_mechanism.value = "deemed_agreed"  ← "동의한 것으로 본다" 명시
+- terms_changes.silent_acceptance_clause.value = True
+- unfair_clause_flags 에 "의사표시_의제" 추가
+
+## 사례 B — 자동 갱신: 거부 통로 있음
+입력 발췌: "구독은 결제 주기 종료일에 자동으로 갱신됩니다. 사용자는 결제일 전까지 ‘계정’ 페이지에서 해지하여 다음 갱신을 막을 수 있습니다."
+판정:
+- pricing.auto_renewal_enabled.value = True, citation.quote="...자동으로 갱신됩니다..."
+- pricing.auto_renewal_consent.value = "opt_out_available"  ← 해지 액션으로 거부 가능, "동의 간주" 표현 없음
+- cancellation.method.value = "online"
+
+## 사례 C — 위약금: 명시적 부재
+입력 발췌: "해지 시 별도의 위약금이 부과되지 않습니다."
+판정:
+- cancellation.penalty_present.value = False, uncertainty="confirmed", citation.quote="해지 시 별도의 위약금이 부과되지 않습니다"
+
+위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C 판정 기준을 적용하세요.
 
 서비스: {service_name} ({service_provider})
 

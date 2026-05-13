@@ -1,0 +1,346 @@
+{
+  "_meta": {
+    "service_name": "Netflix",
+    "instructions": "각 필드의 'expected' 값을 약관 원문 기준으로 정답으로 편집하세요. model_value/source_quote는 참고용. 정답이 약관에 없으면 null 유지, 모호하면 'AMBIGUOUS'로 기록 후 별도 노트. 리스트는 정렬된 형태로 입력. enum 값은 schema/enums.py 참조."
+  },
+  "pricing.base_price_krw": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.billing_cycle": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.auto_renewal_enabled": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "귀하의 Netflix 구독은 해지될 때까지 계속 유지됩니다.",
+    "source_page": 3
+  },
+  "pricing.auto_renewal_consent": {
+    "expected": "opt_out_available",
+    "model_value": "opt_out_available",
+    "model_uncertainty": "confirmed",
+    "source_quote": "해지하려면 '계정' 페이지로 이동하여 해지 관련 안내를 따르시기 바랍니다.",
+    "source_page": 3
+  },
+  "pricing.price_change_notice_days": {
+    "expected": 30,
+    "model_value": 30,
+    "model_uncertainty": "confirmed",
+    "source_quote": "중대한 변경 사항이 있는 경우, Netflix는 해당 변경 사항이 귀하에게 적용되기 최소 1개월 전에 귀하에게 통지합니다.",
+    "source_page": 3
+  },
+  "pricing.price_change_notice_channels": {
+    "expected": [
+      "email",
+      "app_push",
+      "sms",
+      "web_notice",
+      "in_app_banner"
+    ],
+    "model_value": [
+      "email",
+      "app_push",
+      "sms",
+      "web_notice",
+      "in_app_banner"
+    ],
+    "model_uncertainty": "confirmed",
+    "source_quote": "전자적 형태로만 제공합니다.",
+    "source_page": 5
+  },
+  "free_trial.offered": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "inferred",
+    "source_quote": "일부 기능, 콘텐츠 또는 제공 사항은 무료로 제공될 수 있으며, 계정을 생성하거나 결제 수단을 등록하지 않고도 이용할 수 있습니다.",
+    "source_page": 1
+  },
+  "free_trial.duration_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.auto_convert_to_paid": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.cancel_required_before_end": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.payment_method_required_upfront": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "일부 기능, 콘텐츠 또는 제공 사항은 무료로 제공될 수 있으며, 계정을 생성하거나 결제 수단을 등록하지 않고도 이용할 수 있습니다",
+    "source_page": 1
+  },
+  "free_trial.notice_before_conversion_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.method": {
+    "expected": "online",
+    "model_value": "online",
+    "model_uncertainty": "confirmed",
+    "source_quote": "해지하려면 '계정' 페이지로 이동하여 해지 관련 안내를 따르시기 바랍니다.",
+    "source_page": 3
+  },
+  "cancellation.method_description": {
+    "expected": "계정 페이지를 통해 온라인으로 해지",
+    "model_value": "계정 페이지를 통해 온라인으로 해지",
+    "model_uncertainty": "confirmed",
+    "source_quote": "해지하려면 '계정' 페이지로 이동하여 해지 관련 안내를 따르시기 바랍니다.",
+    "source_page": 3
+  },
+  "cancellation.notice_period_days": {
+    "expected": 0,
+    "model_value": 0,
+    "model_uncertainty": "confirmed",
+    "source_quote": "2.7조에 따라 해지를 요청한 경우에는 구독이 즉시 종료됩니다.",
+    "source_page": 3
+  },
+  "cancellation.penalty_present": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "구독 기간의 일부 또는 이용하지 않은 Netflix 콘텐츠에 대한 환불 또는 크레딧은 제공되지 않습니다.",
+    "source_page": 3
+  },
+  "cancellation.penalty_description": {
+    "expected": "결제일로부터 7일 이내에 Netflix 구독을 해지하고 그동안 해당 계정으로 Netflix 콘텐츠를 이용하지 않는 경우, 귀하는 해당 결제 주기에 청구된 구독 요금을 전액 환불 요청할 수 있습니다",
+    "model_value": "결제일로부터 7일 이내에 Netflix 구독을 해지하고 그동안 해당 계정으로 Netflix 콘텐츠를 이용하지 않는 경우, 귀하는 해당 결제 주기에 청구된 구독 요금을 전액 환불 요청할 수 있습니다",
+    "model_uncertainty": "confirmed",
+    "source_quote": "결제일로부터 7일 이내에 Netflix 구독을 해지하고 그동안 해당 계정으로 Netflix 콘텐츠를 이용하지 않는 경우, 귀하는 해당 결제 주기에 청구된 구독 요금을 전액 환불 요청할 수 있습니다",
+    "source_page": 3
+  },
+  "cancellation.proration_policy": {
+    "expected": "no_refund",
+    "model_value": "no_refund",
+    "model_uncertainty": "confirmed",
+    "source_quote": "구독 기간의 일부 또는 이용하지 않은 Netflix 콘텐츠에 대한 환불 또는 크레딧은 제공되지 않습니다",
+    "source_page": 3
+  },
+  "cancellation.blackout_periods": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "terms_changes.notice_channels": {
+    "expected": [
+      "email",
+      "app_push",
+      "sms",
+      "web_notice",
+      "in_app_banner"
+    ],
+    "model_value": [
+      "email",
+      "app_push",
+      "sms",
+      "web_notice",
+      "in_app_banner"
+    ],
+    "model_uncertainty": "confirmed",
+    "source_quote": "전자적 형태로만 제공합니다.",
+    "source_page": 5
+  },
+  "terms_changes.notice_lead_time_days": {
+    "expected": 30,
+    "model_value": 30,
+    "model_uncertainty": "confirmed",
+    "source_quote": "중대한 변경 사항이 있는 경우, Netflix는 해당 변경 사항이 귀하에게 적용되기 최소 1개월 전에 귀하에게 통지합니다.",
+    "source_page": 3
+  },
+  "terms_changes.user_consent_mechanism": {
+    "expected": "opt_out_available",
+    "model_value": "opt_out_available",
+    "model_uncertainty": "confirmed",
+    "source_quote": "귀하는 해당 변경에 동의하지 않는 경우 Netflix 구독을 해지할 수 있습니다.",
+    "source_page": 3
+  },
+  "terms_changes.user_right_to_terminate_on_change": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "귀하는 해당 변경에 동의하지 않는 경우 Netflix 구독을 해지할 수 있습니다.",
+    "source_page": 3
+  },
+  "terms_changes.silent_acceptance_clause": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.collected_categories": {
+    "expected": [
+      "device_id",
+      "payment_method",
+      "contact_info",
+      "account_activity"
+    ],
+    "model_value": [
+      "device_id",
+      "payment_method",
+      "contact_info",
+      "account_activity"
+    ],
+    "model_uncertainty": "inferred",
+    "source_quote": "디바이스 ID, 결제 수단, 연락처 정보 등과 같은 정보를 오퍼 이용 자격 판단에 활용할 수 있습니다.",
+    "source_page": 1
+  },
+  "data_usage.third_party_sharing": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_recipients": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_purposes": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.retention_period_months": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.marketing_use": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.marketing_consent": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.cross_border_transfer": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.service_disruption_compensation": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "Netflix는 안정적인 서비스 제공을 위해 노력합니다. 다만, Netflix의 책임 없이 서비스 중단이나 오류가 발생할 수 있습니다.",
+    "source_page": 5
+  },
+  "liability.compensation_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.damages_cap_present": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.",
+    "source_page": 5
+  },
+  "liability.damages_cap_description": {
+    "expected": "특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.",
+    "model_value": "특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.",
+    "model_uncertainty": "confirmed",
+    "source_quote": "특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.",
+    "source_page": 5
+  },
+  "liability.force_majeure_scope": {
+    "expected": "service interruptions or errors",
+    "model_value": "service interruptions or errors",
+    "model_uncertainty": "inferred",
+    "source_quote": "Netflix는 안정적인 서비스 제공을 위해 노력합니다. 다만, Netflix의 책임 없이 서비스 중단이나 오류가 발생할 수 있습니다",
+    "source_page": 5
+  },
+  "liability.indirect_damages_excluded": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "특별한 사정으로 통상적인 범위를 벗어나는 손해는 Netflix의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다.",
+    "source_page": 5
+  },
+  "disputes.governing_law": {
+    "expected": "대한민국",
+    "model_value": "대한민국",
+    "model_uncertainty": "confirmed",
+    "source_quote": "본 이용 약관은 대한민국 법률의 적용을 받고 그에 따라 해석됩니다.",
+    "source_page": 5
+  },
+  "disputes.jurisdiction_clause": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "disputes.arbitration_required": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "disputes.class_action_waiver": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "unfair_clause_flags": {
+    "expected": [
+      "POST-04",
+      "면책/손배 제한",
+      "해지 절차 복잡"
+    ],
+    "model_value": [
+      "POST-04",
+      "면책/손배 제한",
+      "해지 절차 복잡"
+    ]
+  }
+}

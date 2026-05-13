@@ -139,8 +139,8 @@ async def extract_subscription(
             },
         ],
         "response_format": response_format,
-        "reasoning_effort": "medium",
-        "temperature": 0,  # 추출은 결정론적으로
+        "reasoning_effort": "high",  # 도메인 추출은 더 신중한 reasoning 필요
+        "temperature": 0,  # 추출은 결정론적으로 (Solar는 완전 결정적이진 않지만 variance 최소화)
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)
     content_str = raw["choices"][0]["message"]["content"]

@@ -54,6 +54,7 @@ async def parse_document(
         "output_formats": '["markdown"]',
         "coordinates": "true",
         "ocr": "auto",
+        "mode": "enhanced",  # VLM 기반, 표/체크박스/차트 정밀도↑ (페이지 비용↑)
     }
     raw = await client.post_multipart(DOCUMENT_PARSE_PATH, files=files, data=data)
 
