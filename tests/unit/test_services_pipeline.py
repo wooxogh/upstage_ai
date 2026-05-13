@@ -1,6 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 from schemas.common import Citation, FieldValue, Uncertainty
 from schemas.enums import BillingCycle, ConsentMechanism, NoticeChannel
@@ -10,7 +8,7 @@ from schemas.subscription import (
 )
 from services.ground import GroundednessResult
 from services.parse import DocumentParseResult, ParsedElement
-from services.pipeline import AnalysisResult, StageUsage, run_pipeline
+from services.pipeline import AnalysisResult, run_pipeline
 from services.summarize import KeyClause, KeyClauseCitation, SummaryResult
 
 

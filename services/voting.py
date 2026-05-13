@@ -22,25 +22,31 @@ SECTION_NAMES = (
 )
 
 
-def _value_key(value: Any) -> Any:
-    """voting 비교용 정규화 — list는 정렬된 tuple, enum은 .value로."""
+def _scalar_key(value: Any) -> Any:
+    """단일 값 정규화 — enum은 .value로 풀어 string과 비교 가능하게."""
     if value is None:
         return None
-    if isinstance(value, list):
-        return tuple(sorted(str(x) for x in value))
-    # Enum-like (has .value)
     if hasattr(value, "value") and not isinstance(value, (str, int, bool, float)):
         return value.value
     return value
 
 
-def _is_empty(value: Any) -> bool:
-    """null 또는 빈 컨테이너/문자열을 동등하게 "no data"로 취급."""
+def _value_key(value: Any) -> Any:
+    """voting 비교용 정규화 — list 원소까지 enum.value 풀어서 정렬된 tuple."""
     if value is None:
-        return True
-    if isinstance(value, (list, str)) and len(value) == 0:
-        return True
-    return False
+        return None
+    if isinstance(value, list):
+        return tuple(sorted(_scalar_key(x) for x in value))
+    return _scalar_key(value)
+
+
+def _is_empty(value: Any) -> bool:
+    """voting에서 "데이터 없음"으로 취급할 기준.
+
+    None만 해당. 빈 list([]) / 빈 str("")는 의미 있는 값일 수 있음
+    (예: blackout_periods=[]은 "해지 불가 기간 없음"이라는 confirmed 정보).
+    """
+    return value is None
 
 
 def _vote_field(fvs: list[FieldValue]) -> FieldValue:

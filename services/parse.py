@@ -9,6 +9,10 @@ from services.upstage import UpstageClient
 DOCUMENT_PARSE_PATH = "/document-digitization"
 MODEL = "document-parse"
 DEFAULT_CONTENT_TYPE = "application/pdf"
+# Default mode: "enhanced" — VLM 기반, 표/체크박스/차트 정밀도↑ (페이지 비용↑).
+# 운영 비용에 민감하면 호출자가 mode="standard"로 override 가능.
+# 가능한 값: "standard" (기본 OCR), "enhanced" (VLM), "auto" (자동 선택).
+DEFAULT_PARSE_MODE = "enhanced"
 
 
 def _guess_content_type(filename: str) -> str:
@@ -43,10 +47,12 @@ async def parse_document(
     *,
     file_bytes: bytes,
     filename: str,
+    mode: str = DEFAULT_PARSE_MODE,
 ) -> DocumentParseResult:
     """Upstage Document Parse 호출 → DocumentParseResult 반환.
 
     좌표는 0-1 normalized이며 페이지 width/height 곱해서 pixel로 변환 가능.
+    mode 인자로 parsing 모드 선택 (DEFAULT_PARSE_MODE 주석 참고).
     """
     files = {"document": (filename, file_bytes, _guess_content_type(filename))}
     data = {
@@ -54,7 +60,7 @@ async def parse_document(
         "output_formats": '["markdown"]',
         "coordinates": "true",
         "ocr": "auto",
-        "mode": "enhanced",  # VLM 기반, 표/체크박스/차트 정밀도↑ (페이지 비용↑)
+        "mode": mode,
     }
     raw = await client.post_multipart(DOCUMENT_PARSE_PATH, files=files, data=data)
 

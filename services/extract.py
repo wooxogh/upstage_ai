@@ -169,7 +169,9 @@ async def extract_subscription_with_voting(
     병렬은 Upstage 429 rate limit에 걸려 순차 호출. n=1이면 voting 생략.
     citation은 winning value를 가진 run에서 가져오므로 bbox 보존됨.
     """
-    if n <= 1:
+    if n < 1:
+        raise ValueError(f"n must be >= 1, got {n}")
+    if n == 1:
         return await extract_subscription(
             client,
             parsed_markdown=parsed_markdown,

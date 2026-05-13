@@ -5,7 +5,7 @@ import pytest
 from schemas.common import Uncertainty
 from schemas.enums import BillingCycle, ConsentMechanism
 from schemas.subscription import SubscriptionTerms
-from services.extract import extract_subscription
+from services.extract import extract_subscription, extract_subscription_with_voting
 from services.parse import ParsedElement
 from services.settings import Settings
 from services.upstage import UpstageClient
@@ -107,4 +107,15 @@ async def test_extract_subscription_raises_on_invalid_payload(httpx_mock, settin
             await extract_subscription(
                 client, parsed_markdown="...", parsed_elements=[],
                 service_name="X", service_provider="Y"
+            )
+
+
+@pytest.mark.parametrize("bad_n", [0, -1, -5])
+async def test_extract_with_voting_rejects_n_below_one(settings, bad_n):
+    """n < 1 은 silent fallback 대신 ValueError를 raise."""
+    async with UpstageClient(settings) as client:
+        with pytest.raises(ValueError, match="n must be >= 1"):
+            await extract_subscription_with_voting(
+                client, parsed_markdown="...", parsed_elements=[],
+                service_name="X", service_provider="Y", n=bad_n,
             )

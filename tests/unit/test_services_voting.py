@@ -12,7 +12,7 @@ from schemas.subscription import (
     Cancellation, DataUsage, Disputes, FreeTrial, Liability,
     Pricing, SubscriptionTerms, TermsChanges,
 )
-from services.voting import _vote_field, vote_subscription_terms
+from services.voting import _scalar_key, _vote_field, vote_subscription_terms
 
 
 def _fv(value, page=1, quote="..."):
@@ -61,6 +61,41 @@ def test_vote_field_lists_compared_as_sets():
     voted = _vote_field(fvs)
     # 첫 두 개가 같은 카테고리, 그게 다수
     assert sorted(voted.value) == ["email", "sms"]
+
+
+def test_vote_field_lists_of_enums_normalized_via_value():
+    """list 안의 enum 원소도 .value로 비교 — 'email' string과 NoticeChannel.EMAIL이 같은 것으로 인식."""
+    fvs = [
+        _fv([NoticeChannel.EMAIL, NoticeChannel.SMS]),  # enum form
+        _fv(["email", "sms"]),                            # plain str form (e.g. from JSON dump)
+        _fv([NoticeChannel.EMAIL]),                       # different content
+    ]
+    voted = _vote_field(fvs)
+    # 첫 두 개는 의미적으로 같은 list — voting 시 다수가 되어야 함
+    assert sorted([_scalar_key(x) for x in voted.value]) == ["email", "sms"]
+
+
+def test_vote_field_empty_list_can_be_majority():
+    """`[]` 도 의미 있는 confirmed 값일 수 있음 (예: blackout_periods=[] = 해지 불가 기간 없음).
+    다수가 빈 list면 그것이 winning value여야 함."""
+    fvs = [
+        _fv([]),         # confirmed empty list
+        _fv([]),
+        _fv(["whenever"]),
+    ]
+    voted = _vote_field(fvs)
+    assert voted.value == []  # 다수가 [] 이므로 [] 이 winning
+
+
+def test_vote_field_empty_string_can_be_majority():
+    """빈 문자열도 동등 — penalty_description='' (위약금 없음 명시) 같은 케이스."""
+    fvs = [
+        _fv(""),
+        _fv(""),
+        _fv("위약금 30%"),
+    ]
+    voted = _vote_field(fvs)
+    assert voted.value == ""
 
 
 def test_vote_field_preserves_citation_from_winning_run():
