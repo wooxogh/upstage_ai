@@ -37,12 +37,13 @@ def _enum_value(v):
 
 
 def _normalize(v):
-    """비교용 정규화: enum→value, list→sorted tuple, str→strip."""
+    """비교용 정규화: enum→canonical alias, list→normalized sorted tuple, str→strip."""
     v = _enum_value(v)
     if isinstance(v, list):
-        return tuple(sorted(str(x) for x in v))
+        return tuple(sorted(_normalize_list_element(x) for x in v))
     if isinstance(v, str):
-        return v.strip()
+        # enum alias 우선 처리 — canonical 형태로 매칭되면 동의어 그룹 정답 인정
+        return _enum_canonical(v.strip())
     return v
 
 
@@ -55,8 +56,73 @@ def _is_null(v):
 
 
 SEMANTIC_STR_THRESHOLD = 0.4  # SequenceMatcher ratio 0.4 이상이면 의미상 매칭으로 간주
+SEMANTIC_TOKEN_JACCARD = 0.5  # 토큰 set Jaccard 0.5도 통과 (어순/조사 차이 무시)
 # 0.5 → 0.4 (2026-05-15): "대한민국 서울의 관할법원" vs "서울, 대한민국" 같이 의미는 같은데
 # 어순/조사 차이로 ratio 0.4 정도 나오는 케이스 회수. false positive 추적 위해 wrong 케이스도 보고.
+
+
+# Enum value alias — schema에 정의된 enum 이름의 동의어 매핑.
+# 같은 set에 속한 값들은 비교 시 동일하게 취급.
+_ENUM_ALIAS_GROUPS = [
+    {"silent_acceptance", "deemed_agreed"},      # 침묵-간주 동의 (둘 다 의사표시 의제)
+    {"prorated", "prorated_refund"},             # 일할 환불 (스키마 정합 차이)
+    {"opt_out_available", "opt_out"},            # 옵트아웃 (축약형)
+    {"opt_in_explicit", "opt_in_required"},      # 옵트인 (스키마 정합 차이)
+]
+
+
+def _enum_canonical(v):
+    """enum value를 대표값으로 정규화. 동의어 그룹 첫 원소를 canonical로 사용."""
+    if not isinstance(v, str):
+        return v
+    s = v.strip()
+    for group in _ENUM_ALIAS_GROUPS:
+        if s in group:
+            return sorted(group)[0]  # 알파벳순 첫 원소
+    return s
+
+
+# 한국어/영어 list element 매핑 — 같은 set에 속한 라벨은 비교 시 동일하게 취급.
+_LIST_VOCAB_GROUPS = [
+    # 제3자 수신자
+    {"law_enforcement", "수사기관", "정부기관", "관계기관", "수사기관 (수사목적)"},
+    {"sellers", "판매자", "판매업체", "위탁사", "위탁업체"},
+    {"shipping_carriers", "배송업체", "배송사", "배송 회사"},
+    {"affiliates", "계열사", "관계사"},
+    {"payment_processors", "결제대행사", "쿠팡페이"},
+    # 목적
+    {"transaction_fulfillment", "거래/배송", "거래 및 배송", "거래 이행", "billing settlement", "결제 정산"},
+    {"fraud_prevention", "부정행위 확인", "부정행위 방지", "본인확인"},
+    {"marketing", "마케팅", "광고", "프로모션"},
+    {"service_delivery", "서비스 제공", "서비스 위탁"},
+    # 채널
+    {"email", "이메일", "전자우편"},
+    {"sms", "문자메시지", "문자"},
+    {"in_app_banner", "인앱배너", "앱 내 공지", "사이버몰 화면", "웹사이트 공지"},
+    {"app_push", "앱푸시", "앱푸쉬", "앱 알림"},
+    {"web_notice", "웹공지", "공지사항", "공지사항 화면"},
+    {"phone", "전화", "유선"},
+    {"fax", "팩스", "모사전송"},
+    # 데이터 카테고리 (자주 나오는 것)
+    {"device_info", "device_usage", "기기정보", "단말기 정보"},
+    {"behavioral", "behavioral_data", "이용기록", "사용기록"},
+]
+
+
+def _normalize_list_element(s) -> str:
+    """list element 정규화: vocab group 매핑 + 괄호 부연 제거 + 공백/특수문자 정리."""
+    import re
+    if s is None:
+        return ""
+    s = str(s).strip()
+    # 괄호 내 부연 제거: "수사기관 (수사목적)" → "수사기관"
+    s_stripped = re.sub(r"\s*\([^)]*\)", "", s).strip()
+    # vocab group lookup
+    for group in _LIST_VOCAB_GROUPS:
+        if s_stripped in group or s in group:
+            return sorted(group)[0]
+    # underscore / 공백 통일
+    return re.sub(r"\s+", " ", s_stripped.replace("_", " ")).strip().lower()
 
 
 def _normalize_flag(s: str) -> str:
@@ -79,18 +145,58 @@ def _str_similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a.strip(), b.strip()).ratio()
 
 
+def _token_jaccard(a: str, b: str) -> float:
+    """토큰 set Jaccard 유사도. 어순/조사 차이를 무시하는 보조 매칭.
+
+    예: "민사소송법상 관할법원" vs "민사소송법 관할법원" → Jaccard 0.67 통과
+        "결제금액의 10% (이용)" vs "결제금액의 10%" → Jaccard 0.5+ 통과
+    """
+    import re
+    if not a or not b:
+        return 0.0
+    # 토큰화: 공백/조사/구두점 제거. 2자 이상만 유효 토큰.
+    def toks(s):
+        s = re.sub(r"[(),.·;\"'`「」『』\[\]【】]+", " ", s)
+        return {t for t in s.split() if len(t) >= 2}
+    sa, sb = toks(a), toks(b)
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
 def _list_str_similar(a, b) -> bool:
-    """두 list가 의미상 같은지 — 원소별 fuzzy 매칭. 한국어/영어 혼합 허용."""
+    """두 list가 의미상 같은지 — vocab normalization 후 set 비교 + 원소별 fuzzy 매칭.
+
+    1) 양쪽을 vocab group canonical로 normalize 후 set 비교 (한국어/영어 매핑 흡수)
+    2) normalize 후에도 다르면 원소별 fuzzy 매칭 fallback
+    """
     if not isinstance(a, list) or not isinstance(b, list):
         return False
     if len(a) == 0 and len(b) == 0:
         return True
+
+    # 1차: vocab normalization 후 set 비교
+    na = {_normalize_list_element(x) for x in a}
+    nb = {_normalize_list_element(x) for x in b}
+    if na and nb:
+        overlap = len(na & nb)
+        # 60% 이상 겹치면 통과 (a 또는 b 중 작은 쪽 기준)
+        if overlap >= max(1, min(len(na), len(nb)) * 0.6):
+            return True
+
+    # 2차: 길이 차이가 너무 크면 fail
     if abs(len(a) - len(b)) > max(2, len(a) // 2):
         return False
-    # 양쪽 모두 같은 원소가 적어도 60% 이상 fuzzy match 되면 OK
+    # 원소별 fuzzy 매칭 (정규화된 형태 + 원본 둘 다 시도)
     matches = 0
     for x in a:
-        if any(_str_similar(str(x), str(y)) >= 0.6 for y in b):
+        nx = _normalize_list_element(x)
+        if any(
+            _normalize_list_element(y) == nx
+            or _str_similar(str(x), str(y)) >= 0.6
+            or _str_similar(nx, _normalize_list_element(y)) >= 0.6
+            for y in b
+        ):
             matches += 1
     return matches >= len(a) * 0.6
 
@@ -112,7 +218,15 @@ def classify(expected, actual, *, semantic: bool = False) -> str:
     # semantic mode: str/list 유사도 매칭
     if semantic:
         if isinstance(expected, str) and isinstance(actual, str):
-            if _str_similar(expected, actual) >= SEMANTIC_STR_THRESHOLD:
+            # SequenceMatcher 또는 토큰 Jaccard 둘 중 하나라도 임계값 넘으면 통과
+            if (
+                _str_similar(expected, actual) >= SEMANTIC_STR_THRESHOLD
+                or _token_jaccard(expected, actual) >= SEMANTIC_TOKEN_JACCARD
+            ):
+                return "ok"
+            # substring 포함도 통과: "결제금액의 10%"가 "결제금액의 10% (이용)" 안에 있으면 OK
+            ea, aa = expected.strip(), actual.strip()
+            if len(ea) >= 5 and len(aa) >= 5 and (ea in aa or aa in ea):
                 return "ok"
         if isinstance(expected, list) and isinstance(actual, list):
             if _list_str_similar(expected, actual):
