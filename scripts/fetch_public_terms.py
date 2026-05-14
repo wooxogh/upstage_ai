@@ -93,6 +93,76 @@ def _extract_anthropic_article(html: str, url: str) -> str:
     return m.group(1)
 
 
+def _get_via_wayback(url: str) -> bytes:
+    """Cloudflare 차단 등으로 직접 접근 불가한 도메인은 Wayback `id_` raw snapshot 사용.
+
+    availability API로 최신 스냅샷 timestamp를 찾고 `<ts>id_/` 모드로 받음 (toolbar 제거).
+    """
+    import gzip
+
+    avail_url = f"http://archive.org/wayback/available?url={url}"
+    avail_req = urllib.request.Request(avail_url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(avail_req, timeout=30) as resp:
+        avail = json.loads(resp.read())
+    snap = avail.get("archived_snapshots", {}).get("closest")
+    if not snap or snap.get("status") != "200":
+        raise RuntimeError(f"Wayback: no usable snapshot for {url}")
+    ts = snap["timestamp"]
+    raw_url = f"https://web.archive.org/web/{ts}id_/{url}"
+    req = urllib.request.Request(
+        raw_url,
+        headers={"User-Agent": UA, "Accept-Encoding": "gzip"},
+    )
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        body = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip":
+            body = gzip.decompress(body)
+        return body
+
+
+def _extract_openai_article(html: str, url: str) -> str:
+    """OpenAI 정책 페이지의 본문 `<article class="gap-lg...">` 영역만 추출."""
+    m = re.search(
+        r'(<article class="gap-lg[^"]*">.*?</article>)',
+        html,
+        re.DOTALL,
+    )
+    if not m:
+        raise RuntimeError(f"OpenAI: gap-lg article not found at {url} (page structure changed?)")
+    return m.group(1)
+
+
+def fetch_gpt() -> None:
+    """OpenAI ROW Terms of Use + ROW Privacy Policy 결합.
+
+    openai.com이 Cloudflare로 직접 fetch를 차단 → Wayback raw snapshot 경유.
+    ROW (Rest of World) 약관이 한국 거주자에게 적용됨.
+    """
+    docs = []
+    for slug, title in (
+        ("row-terms-of-use", "Terms of Use (ROW)"),
+        ("row-privacy-policy", "Privacy Policy (ROW)"),
+    ):
+        url = f"https://openai.com/policies/{slug}/"
+        html = _get_via_wayback(url).decode("utf-8", errors="ignore")
+        article = _extract_openai_article(html, url)
+        docs.append((title, url, article))
+
+    body_parts = [
+        f"<hr><h1>OpenAI {title}</h1>\n<p><em>Source: {url}</em></p>\n{article}\n"
+        for title, url, article in docs
+    ]
+    wrapped = (
+        '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8">'
+        '<title>OpenAI ROW Terms + Privacy Policy</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
+    )
+    out = FIXTURE_DIR / "gpt_terms.html"
+    out.write_text(wrapped, encoding="utf-8")
+    total = sum(len(a) for _, _, a in docs)
+    print(f"  → gpt_terms.html ({len(docs)} docs, total {total:,} chars)")
+
+
 def fetch_claude() -> None:
     """Anthropic Consumer Terms + Privacy Policy 결합.
 
@@ -143,6 +213,9 @@ def main():
     elif service == "claude":
         print("Fetching Anthropic Consumer Terms + Privacy Policy...")
         fetch_claude()
+    elif service == "gpt":
+        print("Fetching OpenAI ROW Terms + Privacy (via Wayback)...")
+        fetch_gpt()
     elif service == "all":
         print("Fetching Spotify + Wavve...")
         fetch_spotify()
