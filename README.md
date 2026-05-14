@@ -21,8 +21,10 @@
 |---|---|---|---|---|---|---|
 | **Spotify** | HTML | **73%** | **80%** | 224s | 85K | ✓ |
 | **Netflix** | PDF | 69% | 71% | 308s | 92K | ✓ |
-| **Wavve** | HTML | 57% | 59% | 217s | 54K | ✗ |
-| **평균** | — | **66.3%** | **70.0%** | **250s** | **77K** | 67% |
+| **Wavve** ¹ | HTML×2 | 59% | 61% | 235s | 88K | ✓ |
+| **평균** | — | **67.0%** | **70.7%** | **256s** | **88K** | 100% |
+
+¹ Wavve는 약관이 `서비스` + `유료상품` 두 문서로 분리. 두 문서 결합 후 측정. 단일 문서로는 57%(strict)에 그침 — pricing 섹션 5/6 missed가 `유료상품` 문서에 있었음.
 
 **비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.  
 **현재 갭**: 단일 호출 평균 -10 ~ -14%p (semantic 기준).
@@ -206,6 +208,7 @@ uvicorn app.main:app --reload
 3. **글로벌 vs 한국 사용자 viewpoint**: Spotify처럼 region-specific 조항이 있을 때 모델은 default 채택, 사용자는 한국 사용자 기준 라벨 → 약관 해석 철학 차이.
 4. **`silent_acceptance`, `continued_use_deemed`**: 사용자가 라벨링 중 신규 enum value 필요성 발견. 현 schema는 3개 (opt_in_explicit / opt_out_available / deemed_agreed)로 한정.
 5. **`unfair_clause_flags` controlled vocab**: 사용자 라벨이 `POST-01`, `면책/손배 제한`, `약관 일방 변경권` 등 혼합 표기 → 모델 출력과 매칭 precision 1.0이지만 recall 25-33%.
+6. **다중 문서 약관 (Wavve case)**: Wavve는 `서비스 이용약관` + `유료상품 이용약관` 두 문서로 분리. 초기에 service만 처리해 pricing 5/6 missed(=17%). 두 문서 결합 후 pricing 50%로 회복(+33%p). Tving·Watcha 등도 동일 구조 가능 → fixture 추가 시 다중 문서 확인 필요.
 
 ### 다음 우선순위
 

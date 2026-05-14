@@ -49,24 +49,35 @@ def fetch_spotify() -> None:
 
 
 def fetch_wavve() -> None:
-    """Wavve 서비스 이용약관 — Vue SPA가 apis.wavve.com/terms 호출."""
-    url = "https://apis.wavve.com/terms?type=service&version=last"
-    raw = _get(url)
-    data = json.loads(raw)
-    content = data.get("content", "")
-    if not content:
-        raise RuntimeError("Wavve: content field empty (API changed?)")
-    version = data.get("version", "?")
-    effective = data.get("effectivedate", "?")
+    """Wavve 약관 — service + payment 두 문서를 결합해 저장.
+
+    Wavve는 `서비스 이용약관`과 `유료상품 이용약관`이 분리되어 있어
+    한 쪽만 가져오면 pricing/refund 조항을 못 찾음 (실측: 결합 시 pricing 17%→50%).
+    """
+    docs = []
+    for term_type, title in (("service", "서비스 이용약관"), ("payment", "유료상품 이용약관")):
+        raw = _get(f"https://apis.wavve.com/terms?type={term_type}&version=last")
+        data = json.loads(raw)
+        content = data.get("content", "")
+        if not content:
+            raise RuntimeError(f"Wavve {term_type}: content field empty (API changed?)")
+        docs.append((title, data.get("version", "?"), data.get("effectivedate", "?"), content))
+
+    body_parts = []
+    for title, version, effective, content in docs:
+        body_parts.append(
+            f"<hr><h1>Wavve {title} (v{version}, effective {effective})</h1>\n{content}\n"
+        )
     wrapped = (
         '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
-        f'<title>Wavve 서비스 이용약관 (v{version}, effective {effective})</title>'
-        '</head><body>\n<h1>Wavve 서비스 이용약관</h1>'
-        f'<p>버전: {version}, 시행일: {effective}</p>\n{content}\n</body></html>\n'
+        '<title>Wavve 이용약관 (서비스 + 유료상품)</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
     )
     out = FIXTURE_DIR / "wavve_terms.html"
     out.write_text(wrapped, encoding="utf-8")
-    print(f"  → wavve_terms.html (v{version}, {len(content):,} chars)")
+    total = sum(len(c) for _, _, _, c in docs)
+    versions = " + ".join(f"{t} v{v}" for t, v, _, _ in docs)
+    print(f"  → wavve_terms.html ({versions}, total {total:,} chars)")
 
 
 def main():
