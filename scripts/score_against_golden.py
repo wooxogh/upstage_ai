@@ -54,7 +54,21 @@ def _is_null(v):
     return False
 
 
-SEMANTIC_STR_THRESHOLD = 0.5  # SequenceMatcher ratio 0.5 이상이면 의미상 매칭으로 간주
+SEMANTIC_STR_THRESHOLD = 0.4  # SequenceMatcher ratio 0.4 이상이면 의미상 매칭으로 간주
+# 0.5 → 0.4 (2026-05-15): "대한민국 서울의 관할법원" vs "서울, 대한민국" 같이 의미는 같은데
+# 어순/조사 차이로 ratio 0.4 정도 나오는 케이스 회수. false positive 추적 위해 wrong 케이스도 보고.
+
+
+def _normalize_flag(s: str) -> str:
+    """unfair_clause_flag 정규화: 괄호 내 부연/공백/언더스코어 제거.
+
+    예: "면책/손배 제한 (100만원 한도)" → "면책/손배 제한"
+        "면책/손배_제한" → "면책/손배 제한"
+    """
+    import re
+    s = re.sub(r"\s*\([^)]*\)", "", s).strip()
+    s = s.replace("_", " ")
+    return re.sub(r"\s+", " ", s).strip()
 
 
 def _str_similar(a: str, b: str) -> float:
@@ -224,12 +238,20 @@ def main():
     print()
 
     # unfair_clause_flags
-    gold_flags = set(golden.get("unfair_clause_flags", {}).get("expected") or [])
+    gold_flags_raw = golden.get("unfair_clause_flags", {}).get("expected") or []
+    gold_flags = set(gold_flags_raw)
+    # 정규화된 비교용 set (괄호 부연/언더스코어/공백 제거)
+    gold_flags_norm = {_normalize_flag(f) for f in gold_flags_raw}
     actual_flags = set(run["terms"].get("unfair_clause_flags") or [])
     print("unfair_clause_flags:")
     print(f"  expected: {sorted(gold_flags)}")
+    actual_flags_norm = {_normalize_flag(f) for f in (run["terms"].get("unfair_clause_flags") or [])}
+    matched_norm = actual_flags_norm & gold_flags_norm
+    prec_norm = len(matched_norm) / max(len(actual_flags_norm), 1)
+    rec_norm = len(matched_norm) / max(len(gold_flags_norm), 1)
     print(f"  actual:   {sorted(actual_flags)}")
-    print(f"  precision={len(actual_flags & gold_flags)/max(len(actual_flags),1):.2f}  recall={len(actual_flags & gold_flags)/max(len(gold_flags),1):.2f}")
+    print(f"  precision={len(actual_flags & gold_flags)/max(len(actual_flags),1):.2f}  recall={len(actual_flags & gold_flags)/max(len(gold_flags),1):.2f} (strict)")
+    print(f"  precision={prec_norm:.2f}  recall={rec_norm:.2f} (normalized: 괄호 부연 제거)")
 
 
 if __name__ == "__main__":

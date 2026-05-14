@@ -21,6 +21,17 @@ SYSTEM_PROMPT = """\
    - 예: "집단소송에 대해 약관에 언급 없음" → class_action_waiver는 "not_specified"
    - 예: "본 약관은 집단소송 권리를 제한하지 않습니다" → class_action_waiver=False, "confirmed"
 
+   ⚠️ **한국 OTT 약관에서 일반적으로 적용되지 않는 항목 — 침묵 = False(inferred)**:
+   한국 OTT(Wavve, Tving, Netflix Korea 등) 약관은 한국 강행규정에 의해 다음 항목들이
+   기본적으로 *적용되지 않음*. 본문에 해당 항목을 *적용한다*는 명시적 진술이 없으면
+   `value=False`, `uncertainty="inferred"`, citation은 한국법 적용 조항 또는 분쟁 해결 섹션을 인용.
+   - `disputes.arbitration_required`: "중재", "중재로 해결", "중재 의무" 같은 표현이 없으면 → False, inferred.
+     (한국 강행규정상 의무 중재 조항은 일반적으로 인정 안 됨.)
+   - `disputes.class_action_waiver`: "집단소송 포기", "집단소송 권리 제한" 같은 표현이 없으면 → False, inferred.
+     (한국 집단소송 제도 자체가 제한적이라 명시 부재 = 적용 없음.)
+   - `liability.damages_cap_present`: 손해배상 한도 금액/배수가 본문에 없으면 → False, inferred.
+     (단, "특별한 사정으로 통상적인 범위를 벗어나는 손해는 책임지지 않습니다" 같은 한도 표현이 있으면 True.)
+
    ⚠️ **별도 정책/문서 참조 패턴 (특히 개인정보·결제·앱마켓)**:
    - 약관이 "자세한 사항은 [개인정보처리방침/별도 정책/관련 정책]을 참고하시기 바랍니다",
      "결제 정책은 앱마켓에 따릅니다" 같이 **외부 문서로 위임**하면:

@@ -25,8 +25,9 @@ LOG_MD = RESULTS_DIR / f"experiments_{time.strftime('%Y%m%d_%H%M%S')}.md"
 
 # (config_name, env_overrides, num_runs)
 CONFIGS = [
-    # Round 4: Netflix HTML (markdown extractor + 사례 E soft-negation prompt) 3회
-    ("netflix_html_v3", {"EXTRACT_FIXTURE": "netflix", "EXTRACT_ENSEMBLE_N": "2", "EXTRACT_REASONING_EFFORT": "medium"}, 3),
+    # Round 6: BC + prompt fix #1 (Korean OTT bool default inferred=False) 검증 3 runs
+    # Defaults: extract N=2 medium, summarize high, ground medium
+    ("BC_plus_korean_bool_fix", {"EXTRACT_FIXTURE": "netflix"}, 3),
 ]
 
 
