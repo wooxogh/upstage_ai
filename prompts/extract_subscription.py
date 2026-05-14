@@ -86,12 +86,29 @@ SYSTEM_PROMPT = """\
 
 판단 룰: **"~하지 않습니다", "없습니다", "제한하지 않습니다", "의무가 없습니다"** 등 **부정·부재의 명시적 진술**이 있으면 그 사실 자체가 confirmed 정보. not_specified로 빠지면 안 됨.
 
+## 사례 E — 소프트 부정 (책임 면제/한도 약관, 자주 빠뜨림)
+입력 발췌: "당사는 안정적인 서비스 제공을 위해 노력합니다. 다만, 당사의 책임 없이 서비스 중단이나 오류가 발생할 수 있습니다. 당사는 고의 또는 과실로 인하여 귀하가 입은 손해를 배상하되, 특별한 사정으로 통상적인 범위를 벗어나는 손해는 당사의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다."
+
+이 짧은 단락 한 곳에서 6개 필드 추출 가능:
+- liability.service_disruption_compensation.value = False, "confirmed" — "책임 없이 서비스 중단이나 오류가 발생할 수 있습니다" ⇒ 보상 의무 부재
+- liability.compensation_description.value = (해당 문장 인용), "confirmed"
+- liability.damages_cap_present.value = True, "confirmed" — "통상적인 범위를 벗어나는 손해는 ... 책임지지 않습니다" ⇒ 손해배상 한도 설정
+- liability.damages_cap_description.value = "특별한 사정으로 통상적인 범위를 벗어나는 손해는...책임지지 않습니다", "confirmed"
+- liability.force_majeure_scope.value = "당사의 책임 없이 발생하는 서비스 중단 및 오류", "confirmed"
+- liability.indirect_damages_excluded.value = True, "confirmed" — "특별한 사정으로 통상적인 범위를 벗어나는 손해" = 간접손해 제외
+
+**소프트 부정 패턴** (잘 못 잡는 표현들 — 발견 시 not_specified 처리 금지):
+- "책임 없이 ... 발생할 수 있습니다" ⇒ 보상/책임 의무 부재 (False)
+- "책임지지 않습니다" / "책임을 부담하지 않습니다" ⇒ 책임 부재 (False)
+- "통상적인 범위를 벗어나는 손해는 ... 책임지지 않습니다" ⇒ 손해배상 한도 + 간접손해 제외 (둘 다 True)
+- "노력합니다" 만으로는 보장 의무 없음을 시사 — 보장 부재로 해석 가능
+
 위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D 판정 기준을 적용하세요.
-특히 사례 D (명시적 부재 vs 침묵 구분)을 약관 전체에 일관되게 적용하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E 판정 기준을 적용하세요.
+특히 사례 D (명시적 부재) + 사례 E (소프트 부정 — 책임 제한 영역)을 약관 전체에 일관되게 적용하세요.
 
 서비스: {service_name} ({service_provider})
 

@@ -18,38 +18,69 @@ HTML_EXTS = (".html", ".htm")
 
 
 class _HTMLTextExtractor(HTMLParser):
-    """HTML → 정렬된 plain text. <script>/<style> 제외, 블록 단위 줄바꿈 보존."""
+    """HTML → markdown. Heading/list/strong 등 구조 보존.
 
-    BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br", "div", "tr", "section", "article"}
+    Solar Pro 3가 약관의 섹션 위계 ("## 5. 보증 및 책임의 제한")를 인식할 수 있도록
+    의미 있는 tag를 markdown으로 변환. 단순 plain text로 평탄화하면 long-doc 추출 시
+    섹션 단위 navigation이 안 됨 (실측: Netflix HTML liability 0/6 → markdown 변환으로 회복).
+    """
+
+    HEADING_TAGS = {"h1": "# ", "h2": "## ", "h3": "### ", "h4": "#### ", "h5": "##### ", "h6": "###### "}
+    BLOCK_TAGS = {"p", "br", "div", "tr", "section", "article"}
     SKIP_TAGS = {"script", "style", "noscript"}
 
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
         self.skip_depth = 0
+        self.in_strong = 0  # <strong>/<b> 중첩 카운터
 
     def handle_starttag(self, tag: str, attrs):
         if tag in self.SKIP_TAGS:
             self.skip_depth += 1
-        elif tag in self.BLOCK_TAGS and self.skip_depth == 0:
+            return
+        if self.skip_depth > 0:
+            return
+        if tag in self.HEADING_TAGS:
+            self.parts.append("\n\n" + self.HEADING_TAGS[tag])
+        elif tag == "li":
+            self.parts.append("\n- ")
+        elif tag in ("strong", "b"):
+            self.in_strong += 1
+            self.parts.append("**")
+        elif tag in self.BLOCK_TAGS:
             self.parts.append("\n")
 
     def handle_endtag(self, tag: str):
         if tag in self.SKIP_TAGS:
             self.skip_depth = max(0, self.skip_depth - 1)
+            return
+        if self.skip_depth > 0:
+            return
+        if tag in self.HEADING_TAGS:
+            self.parts.append("\n")
+        elif tag in ("strong", "b"):
+            self.in_strong = max(0, self.in_strong - 1)
+            self.parts.append("**")
 
     def handle_data(self, data: str):
         if self.skip_depth == 0:
             text = data.strip()
             if text:
-                self.parts.append(text)
+                self.parts.append(text + " ")
 
     def get_text(self) -> str:
-        raw = " ".join(self.parts)
-        # 연속 줄바꿈/공백 정리
-        lines = [line.strip() for line in raw.split("\n")]
-        lines = [line for line in lines if line]
-        return "\n\n".join(lines)
+        raw = "".join(self.parts)
+        # 4+ 연속 줄바꿈 → 2개로 정리 (markdown 단락 구분 유지)
+        import re
+        raw = re.sub(r"\n{3,}", "\n\n", raw)
+        # 공백 정리: 한 줄 안에서 연속 공백 1개로
+        lines = [re.sub(r" +", " ", line).strip() for line in raw.split("\n")]
+        # 헤더 행이 공백 헤더 ("## ") 만 있으면 제거
+        return "\n".join(line for line in lines if line and line not in HEADING_TAGS_ALONE).strip()
+
+
+HEADING_TAGS_ALONE = {"# ", "## ", "### ", "#### ", "##### ", "###### "}
 
 
 def _guess_content_type(filename: str) -> str:

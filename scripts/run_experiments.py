@@ -25,9 +25,8 @@ LOG_MD = RESULTS_DIR / f"experiments_{time.strftime('%Y%m%d_%H%M%S')}.md"
 
 # (config_name, env_overrides, num_runs)
 CONFIGS = [
-    # Round 3: G 신뢰도 확정 + D 변동성
-    ("G_N2_medium_validate", {"EXTRACT_ENSEMBLE_N": "2", "EXTRACT_REASONING_EFFORT": "medium"}, 5),
-    ("D_N1_medium_extra", {"EXTRACT_ENSEMBLE_N": "1", "EXTRACT_REASONING_EFFORT": "medium"}, 3),
+    # Round 4: Netflix HTML (markdown extractor + 사례 E soft-negation prompt) 3회
+    ("netflix_html_v3", {"EXTRACT_FIXTURE": "netflix", "EXTRACT_ENSEMBLE_N": "2", "EXTRACT_REASONING_EFFORT": "medium"}, 3),
 ]
 
 
