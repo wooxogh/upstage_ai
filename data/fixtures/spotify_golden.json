@@ -1,0 +1,328 @@
+{
+  "_meta": {
+    "service_name": "Spotify",
+    "instructions": "각 필드의 'expected' 값을 약관 원문 기준으로 정답으로 편집하세요. model_value/source_quote는 참고용. 정답이 약관에 없으면 null 유지, 모호하면 'AMBIGUOUS'로 기록 후 별도 노트. 리스트는 정렬된 형태로 입력. enum 값은 schema/enums.py 참조."
+  },
+  "pricing.base_price_krw": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.billing_cycle": {
+    "expected": "monthly",
+    "model_value": "monthly",
+    "model_uncertainty": "confirmed",
+    "source_quote": "월 단위 또는 구입 전에 고지되는 다른 반복 주기로 구독 요금을 선결제하는 방법",
+    "source_page": 2
+  },
+  "pricing.auto_renewal_enabled": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "유료 구독은 해지될 때까지 기한의 정함 없이 지속됩니다.",
+    "source_page": 3
+  },
+  "pricing.auto_renewal_consent": {
+    "expected": "opt_out_available",
+    "model_value": "opt_out_available",
+    "model_uncertainty": "inferred",
+    "source_quote": "회원은 언제든지 유료 구독을 해지할 수 있습니다.",
+    "source_page": 3
+  },
+  "pricing.price_change_notice_days": {
+    "expected": 30,
+    "model_value": 30,
+    "model_uncertainty": "confirmed",
+    "source_quote": "최소 30일 이상의 기간을 두고 회원에게 가격 변경을 사전에 고지합니다.",
+    "source_page": 2
+  },
+  "pricing.price_change_notice_channels": {
+    "expected": [
+      "email",
+      "app_push",
+      "web_notice"
+    ],
+    "model_value": [
+      "email",
+      "app_push",
+      "web_notice"
+    ],
+    "model_uncertainty": "confirmed",
+    "source_quote": "이메일, 앱 내 알림, 기타 합리적인 방법",
+    "source_page": 2
+  },
+  "free_trial.offered": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "ambiguous",
+    "source_quote": "당사는 일정 기간 무료 또는 할인된 요금으로 유료 구독을 체험할 수 있는 평가판(\"평가판\")을 수시로 제공할 수 있습니다.",
+    "source_page": 2
+  },
+  "free_trial.duration_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.auto_convert_to_paid": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원이 유료 구독을 계속 유지하려면 평가판 종료 30일 전부터 종료시까지의 기간 내에 명시적으로 동의해야 합니다.",
+    "source_page": 2
+  },
+  "free_trial.cancel_required_before_end": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "평가판 종료 후에는 매달 합의된 금액의 청구일로부터 7일 이내에 청약철회 권리를 행사할 수 있으나, 회원이 해당 기간 중 Spotify 서비스를 이용할 경우 청약철회권은 소멸됩니다.",
+    "source_page": 2
+  },
+  "free_trial.payment_method_required_upfront": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "평가판을 통해 Spotify 서비스를 사용하는 경우 Spotify 프리미엄 프로모션 제안 약관에 동의하게 됩니다.",
+    "source_page": 2
+  },
+  "free_trial.notice_before_conversion_days": {
+    "expected": 30,
+    "model_value": 30,
+    "model_uncertainty": "confirmed",
+    "source_quote": "평가판 종료 30일 전부터 종료시까지의 기간 내에 명시적으로 동의해야 합니다.",
+    "source_page": 2
+  },
+  "cancellation.method": {
+    "expected": "online",
+    "model_value": "online",
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 Spotify 계정에 로그인하여 계정 페이지의 안내를 따르거나 여기 를 클릭하여 조회되는 지침에 따라 언제든지 유료 구독을 해지할 수 있습니다.",
+    "source_page": 3
+  },
+  "cancellation.method_description": {
+    "expected": "Spotify 계정 페이지에서 온라인 해지",
+    "model_value": "Spotify 계정 페이지에서 온라인 해지",
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 Spotify 계정에 로그인하여 계정 페이지의 안내를 따르거나 여기 를 클릭하여 조회되는 지침에 따라 언제든지 유료 구독을 해지할 수 있습니다.",
+    "source_page": 3
+  },
+  "cancellation.notice_period_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.penalty_present": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "본 약관에 명시적으로 규정된 경우를 제외하고, 구독 기간 일부분에 대한 환불 또는 크레딧은 제공되지 않습니다.",
+    "source_page": 3
+  },
+  "cancellation.penalty_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.proration_policy": {
+    "expected": "no_refund",
+    "model_value": "no_refund",
+    "model_uncertainty": "confirmed",
+    "source_quote": "구독 기간 일부분에 대한 환불 또는 크레딧은 제공되지 않습니다.",
+    "source_page": 3
+  },
+  "cancellation.blackout_periods": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "terms_changes.notice_channels": {
+    "expected": [
+      "email",
+      "app_push",
+      "web_notice",
+      "web_notice"
+    ],
+    "model_value": [
+      "email",
+      "app_push",
+      "web_notice",
+      "web_notice"
+    ],
+    "model_uncertainty": "confirmed",
+    "source_quote": "중대한 변경 사항의 경우, 당사는 이메일, 서비스 내 팝업 메시지, 또는 다른 방법을 통해 추가 통지를 할 것입니다.",
+    "source_page": 7
+  },
+  "terms_changes.notice_lead_time_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "inferred",
+    "source_quote": "변경사항이 적용되지 전에 ... 합리적인 방법으로 회원에게 통지",
+    "source_page": 7
+  },
+  "terms_changes.user_consent_mechanism": {
+    "expected": "deemed_agreed",
+    "model_value": "deemed_agreed",
+    "model_uncertainty": "confirmed",
+    "source_quote": "본 약관의 변경 후 Spotify 서비스를 계속 사용하는 것은 회원이 해당 변경 사항에 동의하는 것으로 간주됩니다.",
+    "source_page": 7
+  },
+  "terms_changes.user_right_to_terminate_on_change": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 언제든지 본 약관을 해지할 수 있으며, 해지하는 경우 Spotify 서비스에 계속하여 액세스하거나 이용할 수 없습니다.",
+    "source_page": 7
+  },
+  "terms_changes.silent_acceptance_clause": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "본 약관의 변경 후 Spotify 서비스를 계속 사용하는 것은 회원이 해당 변경 사항에 동의하는 것으로 간주됩니다.",
+    "source_page": 7
+  },
+  "data_usage.collected_categories": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_sharing": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_recipients": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_purposes": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.retention_period_months": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.marketing_use": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.marketing_consent": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.cross_border_transfer": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.service_disruption_compensation": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "Spotify는 정부 기관의 조치, 기타 제3자 또는 당사의 통제 범위를 벗어나는 사건으로 인해 발생한 인터넷 또는 기타 서비스의 중단이나 장애와 관련하여 회원에게 책임을 지지 않으며, 환불 의무가 없습니다.",
+    "source_page": 3
+  },
+  "liability.compensation_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.damages_cap_present": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "어떠한 경우에도 Spotify, 그 임원, 주주, 직원, 대리인, 이사, 자회사, 계열사, 승계인, 양수인, 공급업체 또는 라이선스 제공자는 (1) 간접, 특별, 부수적, 징벌적, 예시적, 또는 결과적 손해; (2)",
+    "source_page": 6
+  },
+  "liability.damages_cap_description": {
+    "expected": "첫 번째 청구 전 12개월 동안 회원이 Spotify에 지불한 금액 또는 $30.00 중 더 큰 금액을 초과하는 범위에 대하여 책임지지 않음",
+    "model_value": "첫 번째 청구 전 12개월 동안 회원이 Spotify에 지불한 금액 또는 $30.00 중 더 큰 금액을 초과하는 범위에 대하여 책임지지 않음",
+    "model_uncertainty": "confirmed",
+    "source_quote": "어떠한 경우에도 Spotify, 그 임원, 주주, 직원, 대리인, 이사, 자회사, 계열사, 승계인, 양수인, 공급업체 또는 라이선스 제공자는 (1) 간접, 특별, 부수적, 징벌적, 예시적, 또는 결과적 손해; (2)",
+    "source_page": 6
+  },
+  "liability.force_majeure_scope": {
+    "expected": "정부 기관의 조치, 기타 제3자 또는 당사의 통제 범위를 벗어나는 사건",
+    "model_value": "정부 기관의 조치, 기타 제3자 또는 당사의 통제 범위를 벗어나는 사건",
+    "model_uncertainty": "confirmed",
+    "source_quote": "당사는 정부 기관의 조치, 기타 제3자 또는 당사의 통제 범위를 벗어나는 사건으로 인해 발생한 인터넷 또는 기타 서비스의 중단이나 장애와 관련하여 회원에게 책임을 지지 않으며, 환불 의무가 없습니다.",
+    "source_page": 6
+  },
+  "liability.indirect_damages_excluded": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "간접, 특별, 부수적, 징벌적, 예시적, 또는 결과적 손해",
+    "source_page": 6
+  },
+  "disputes.governing_law": {
+    "expected": "Sweden",
+    "model_value": "Sweden",
+    "model_uncertainty": "confirmed",
+    "source_quote": "Spotify를 이용할 수 있는 그 외 모든 국가 및 지역. 스웨덴",
+    "source_page": 6
+  },
+  "disputes.jurisdiction_clause": {
+    "expected": "Sweden (exclusive) for most countries; Korea (Seoul) exclusive",
+    "model_value": "Sweden (exclusive) for most countries; Korea (Seoul) exclusive",
+    "model_uncertainty": "confirmed",
+    "source_quote": "불가리아, 키프로스, 에스토니아, 프랑스, 홍콩, 라트비아, 리투아니아, 룩셈부르크, 몰타, 모나코, 노르웨이, 필리핀, 포르투갈, 슬로바키아, 스페인, 터키: 스웨덴 법률, 스웨덴 법원(비배타적). 대한민국: 대한",
+    "source_page": 6
+  },
+  "disputes.arbitration_required": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "모든 분쟁, 청구 또는 논쟁은 의무적 구속력 있는 개별 중재에 의해 결정",
+    "source_page": 6
+  },
+  "disputes.class_action_waiver": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "inferred",
+    "source_quote": "모든 분쟁, 청구 또는 논쟁은 의무적 구속력 있는 개별 중재에 의해 결정",
+    "source_page": 6
+  },
+  "unfair_clause_flags": {
+    "expected": [
+      "면책/손배 제한",
+      "의사표시_의제"
+    ],
+    "model_value": [
+      "면책/손배 제한",
+      "의사표시_의제"
+    ]
+  }
+}

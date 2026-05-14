@@ -29,7 +29,12 @@ DEFAULT_FIXTURE = "netflix"
 
 
 def _resolve_fixture(name: str) -> Path:
-    return FIXTURE_DIR / f"{name}_terms.pdf"
+    """fixture name → 파일 경로. .pdf 우선, 없으면 .html 시도."""
+    for ext in (".pdf", ".html"):
+        candidate = FIXTURE_DIR / f"{name}_terms{ext}"
+        if candidate.exists():
+            return candidate
+    return FIXTURE_DIR / f"{name}_terms.pdf"  # 디폴트 (없는 경우 에러용)
 
 
 async def main():

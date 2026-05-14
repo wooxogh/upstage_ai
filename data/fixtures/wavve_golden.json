@@ -1,0 +1,314 @@
+{
+  "_meta": {
+    "service_name": "Wavve",
+    "instructions": "각 필드의 'expected' 값을 약관 원문 기준으로 정답으로 편집하세요. model_value/source_quote는 참고용. 정답이 약관에 없으면 null 유지, 모호하면 'AMBIGUOUS'로 기록 후 별도 노트. 리스트는 정렬된 형태로 입력. enum 값은 schema/enums.py 참조."
+  },
+  "pricing.base_price_krw": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.billing_cycle": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.auto_renewal_enabled": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.auto_renewal_consent": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.price_change_notice_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "pricing.price_change_notice_channels": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.offered": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.duration_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.auto_convert_to_paid": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.cancel_required_before_end": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.payment_method_required_upfront": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "free_trial.notice_before_conversion_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.method": {
+    "expected": "online",
+    "model_value": "online",
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 회사에 언제든지 탈퇴를 요청할 수 있으며 회사는 즉시 회원탈퇴를 처리합니다. 'MY>정보수정>회원탈퇴'에서 언제든지 탈퇴를 요청할 수 있으며, 고객센터 e‑mail, 전화 등으로 연락하면 신속하게 처리합니다.",
+    "source_page": 5
+  },
+  "cancellation.method_description": {
+    "expected": "온라인 및 고객센터(e‑mail, 전화) 요청",
+    "model_value": "온라인 및 고객센터(e‑mail, 전화) 요청",
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 회사에 언제든지 탈퇴를 요청할 수 있으며 회사는 즉시 회원탈퇴를 처리합니다. 'MY>정보수정>회원탈퇴'에서 언제든지 탈퇴를 요청할 수 있으며, 고객센터 e‑mail, 전화 등으로 연락하면 신속하게 처리합니다.",
+    "source_page": 5
+  },
+  "cancellation.notice_period_days": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.penalty_present": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.penalty_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.proration_policy": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "cancellation.blackout_periods": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "terms_changes.notice_channels": {
+    "expected": [
+      "in_app_banner",
+      "email"
+    ],
+    "model_value": [
+      "in_app_banner",
+      "email"
+    ],
+    "model_uncertainty": "confirmed",
+    "source_quote": "서비스 초기 화면을 통하여 게시하거나 전자우편 기타의 방법으로 회원에게 개별 통지",
+    "source_page": 2
+  },
+  "terms_changes.notice_lead_time_days": {
+    "expected": 7,
+    "model_value": 7,
+    "model_uncertainty": "confirmed",
+    "source_quote": "적용일자 7일 이전부터 적용일자 전일까지 공지",
+    "source_page": 2
+  },
+  "terms_changes.user_consent_mechanism": {
+    "expected": "deemed_agreed",
+    "model_value": "deemed_agreed",
+    "model_uncertainty": "confirmed",
+    "source_quote": "시행일 이후에 서비스를 이용하는 회원은 변경된 약관에 동의한 것으로 간주합니다.",
+    "source_page": 2
+  },
+  "terms_changes.user_right_to_terminate_on_change": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 변경된 약관에 동의하지 않을 경우 이용계약을 해지할 수 있습니다.",
+    "source_page": 2
+  },
+  "terms_changes.silent_acceptance_clause": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.collected_categories": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_sharing": {
+    "expected": false,
+    "model_value": false,
+    "model_uncertainty": "confirmed",
+    "source_quote": "목적 외로 이용하거나 제3자에게 제공할 수 없으며, 이를 위반한 경우에 모든 책임은 회사가 집니다. 다만, 다음의 경우에는 예외로 합니다.",
+    "source_page": 3
+  },
+  "data_usage.third_party_recipients": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.third_party_purposes": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.retention_period_months": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "data_usage.marketing_use": {
+    "expected": true,
+    "model_value": true,
+    "model_uncertainty": "confirmed",
+    "source_quote": "회사는 회원에게 편리하고 다양한 서비스를 제공하기 위하여 관련 법령이 정한 절차와 제한 범위 내에서 회원으로부터 수집한 개인정보를 이용하여 회사가 제공하는 각종 서비스에 대한 정보, 광고, 타사의 상품이나 서비스, ",
+    "source_page": 3
+  },
+  "data_usage.marketing_consent": {
+    "expected": "opt_out_available",
+    "model_value": "opt_out_available",
+    "model_uncertainty": "confirmed",
+    "source_quote": "회원은 관련 법에 따른 거래 관련 정보 및 고객 문의 등에 대한 답변 등을 제외하고는 언제든지 전자우편 등에 대해서 서비스 및 광고를 거절할 수 있습니다.",
+    "source_page": 3
+  },
+  "data_usage.cross_border_transfer": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.service_disruption_compensation": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.compensation_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.damages_cap_present": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.damages_cap_description": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "liability.force_majeure_scope": {
+    "expected": "천재지변 또는 이에 준하는 불가항력 기타 회사의 책임없는 사유",
+    "model_value": "천재지변 또는 이에 준하는 불가항력 기타 회사의 책임없는 사유",
+    "model_uncertainty": "confirmed",
+    "source_quote": "천재지변 또는 이에 준하는 불가항력 기타 회사의 책임없는 사유로 인하여 서비스를 제공할 수 없는 경우에는 서비스 제공에 관한 책임이 면제됩니다.",
+    "source_page": 6
+  },
+  "liability.indirect_damages_excluded": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "disputes.governing_law": {
+    "expected": "대한민국 법률",
+    "model_value": "대한민국 법률",
+    "model_uncertainty": "confirmed",
+    "source_quote": "대한민국 법률을 준거법으로 합니다.",
+    "source_page": 6
+  },
+  "disputes.jurisdiction_clause": {
+    "expected": "회원 주소 관할 지방법원",
+    "model_value": "회원 주소 관할 지방법원",
+    "model_uncertainty": "confirmed",
+    "source_quote": "제소 당시 회원의 주소에 의하고, 주소가 없는 경우 거소를 관할하는 지방법원의 전속관할로 합니다.",
+    "source_page": 6
+  },
+  "disputes.arbitration_required": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "disputes.class_action_waiver": {
+    "expected": null,
+    "model_value": null,
+    "model_uncertainty": "not_specified",
+    "source_quote": "",
+    "source_page": null
+  },
+  "unfair_clause_flags": {
+    "expected": [
+      "의사표시_의제"
+    ],
+    "model_value": [
+      "의사표시_의제"
+    ]
+  }
+}

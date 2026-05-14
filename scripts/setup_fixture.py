@@ -41,11 +41,13 @@ async def main():
     service_name = sys.argv[1]
     src_pdf = Path(sys.argv[2]).expanduser()
     if not src_pdf.exists():
-        print(f"ERROR: PDF not found: {src_pdf}")
+        print(f"ERROR: source file not found: {src_pdf}")
         sys.exit(1)
 
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
-    fixture_pdf = FIXTURE_DIR / f"{service_name}_terms.pdf"
+    # 원본 확장자 보존 (pdf 또는 html — Document Parse 둘 다 지원)
+    ext = src_pdf.suffix.lower() or ".pdf"
+    fixture_pdf = FIXTURE_DIR / f"{service_name}_terms{ext}"
     baseline_run = FIXTURE_DIR / f"{service_name}_run_baseline.json"
     golden_path = FIXTURE_DIR / f"{service_name}_golden.json"
 
