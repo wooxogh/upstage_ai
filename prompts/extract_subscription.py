@@ -20,6 +20,21 @@ SYSTEM_PROMPT = """\
    - 예: "보상 의무를 부담하지 않습니다" → service_disruption_compensation=False, "confirmed"
    - 예: "집단소송에 대해 약관에 언급 없음" → class_action_waiver는 "not_specified"
    - 예: "본 약관은 집단소송 권리를 제한하지 않습니다" → class_action_waiver=False, "confirmed"
+
+   ⚠️ **별도 정책/문서 참조 패턴 (특히 개인정보·결제·앱마켓)**:
+   - 약관이 "자세한 사항은 [개인정보처리방침/별도 정책/관련 정책]을 참고하시기 바랍니다",
+     "결제 정책은 앱마켓에 따릅니다" 같이 **외부 문서로 위임**하면:
+     → 해당 주제 필드는 **"not_specified"** (이 약관 본문에서는 침묵)
+     → False/[]/0으로 추측해 채우지 말 것. 외부 문서 내용은 inferred 처리 금지.
+   - 예: "개인정보 수집·이용·제공은 별도의 개인정보처리방침에 따릅니다"
+     → data_usage.collected_categories, third_party_sharing, marketing_use 등 모두 **not_specified**
+     → False로 채우면 "이 약관이 명시적으로 부재를 진술했다"는 잘못된 의미가 됨.
+   - 예: "결제 처리는 카카오페이/구글플레이 정책에 따릅니다"
+     → 외부 처리자 이름은 third_party_recipients에 confirmed로 기록 가능하지만,
+        marketing_use, cross_border_transfer 같이 본문에 직접 진술 없는 필드는 not_specified.
+
+   ⚠️ **free_trial 섹션**: 약관에 무료 체험에 대한 언급 자체가 없으면 모든 free_trial 필드 = "not_specified".
+     "현재 Netflix는 한국에서 무료체험 미제공" 같은 명시적 부재가 없다면 False/0으로 추측 금지.
 4. **citation 의무**: value가 null이 아니거나 uncertainty가 "confirmed"/"inferred"/"ambiguous" 면 citation 필수 (page + 원문 quote). quote는 약관 원문에서 직접 발췌한 10~80자 문자열 (변형/요약 금지). 절대 빈 문자열("")이나 "..." placeholder를 quote에 넣지 말 것. bbox/section은 채우지 말 것 — 후처리에서 채워짐.
    pain_point_id는 다음 11개 중 정확히 하나만 사용 (해당 없으면 null):
    - PRE-01 (분량/난이도 압박), PRE-02 (혜택-약관 괴리), PRE-03 (무료체험→자동전환), PRE-04 (개인정보 활용)

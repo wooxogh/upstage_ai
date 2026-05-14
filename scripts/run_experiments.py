@@ -25,11 +25,9 @@ LOG_MD = RESULTS_DIR / f"experiments_{time.strftime('%Y%m%d_%H%M%S')}.md"
 
 # (config_name, env_overrides, num_runs)
 CONFIGS = [
-    # Round 2: C 변동성 확인 + 더 가벼운 옵션
-    ("C_N3_medium_extra", {"EXTRACT_ENSEMBLE_N": "3", "EXTRACT_REASONING_EFFORT": "medium"}, 3),
-    ("G_N2_medium", {"EXTRACT_ENSEMBLE_N": "2", "EXTRACT_REASONING_EFFORT": "medium"}, 2),
-    ("E_N3_low", {"EXTRACT_ENSEMBLE_N": "3", "EXTRACT_REASONING_EFFORT": "low"}, 2),
-    ("F_N5_medium", {"EXTRACT_ENSEMBLE_N": "5", "EXTRACT_REASONING_EFFORT": "medium"}, 1),
+    # Round 3: G 신뢰도 확정 + D 변동성
+    ("G_N2_medium_validate", {"EXTRACT_ENSEMBLE_N": "2", "EXTRACT_REASONING_EFFORT": "medium"}, 5),
+    ("D_N1_medium_extra", {"EXTRACT_ENSEMBLE_N": "1", "EXTRACT_REASONING_EFFORT": "medium"}, 3),
 ]
 
 

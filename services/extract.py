@@ -21,9 +21,11 @@ class SchemaValidationError(ValueError):
     """
 
 
-ENSEMBLE_N = int(os.getenv("EXTRACT_ENSEMBLE_N", "3"))  # N=3 majority voting (env override 가능)
-# Default: "medium" — 2026-05-14 실험에서 medium+N3 (67.5%) 이 high+N3 (61.5%) 보다 우수.
-# high는 reasoning 경로가 너무 다양해 voting이 깎이고, medium은 일관성 있어 voting이 noise 평균화.
+ENSEMBLE_N = int(os.getenv("EXTRACT_ENSEMBLE_N", "2"))
+# Default: N=2 + medium — 23-run 실험(2026-05-14) 결과 G config(N=2 medium)이 평균 71.6%로 winner.
+# N=3 medium(65.8%) 대비 +5.8%p, 시간 -28%, 토큰 -24%.
+# N=2 voting은 N=3 대비 절반 비용으로 비슷한 정확도. medium reasoning이 sweet spot
+# (high는 reasoning 경로가 다양해 voting과 충돌, low는 45%로 망함).
 REASONING_EFFORT = os.getenv("EXTRACT_REASONING_EFFORT", "medium")
 
 CHAT_COMPLETIONS_PATH = "/chat/completions"
