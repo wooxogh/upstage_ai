@@ -15,32 +15,33 @@
 
 ## 📊 성능 평가 (7 서비스, 사람 라벨 기준)
 
-7개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 단일 호출 정확도:
+7개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 정확도. **default config = BC (N=2 voting + medium reasoning) + prompt #1 (한국 OTT bool 추론 룰)**, 서비스당 2 runs 평균 (병렬 동시성 3, 총 22.2분):
 
-| 서비스 | 형식 | Strict | Semantic | 추출 시간 | 토큰 | grounded |
+| 서비스 | 형식 | Strict | Semantic | Range | 추출 시간 | 토큰 |
 |---|---|---|---|---|---|---|
-| **Spotify** | HTML | **73%** | **80%** | 224s | 85K | ✓ |
-| **Netflix** | PDF | 69% | 71% | 308s | 92K | ✓ |
-| **Coupang Play** ² | HTML×2 | 64% | 66% | 77s | 74K | ✓ |
-| **Netflix** | HTML | 61% | 66% | 191s | 62K | ✓ |
-| **Disney+** ⁴ | HTML | 57% | 61% | 115s | 102K | ✓ |
-| **Wavve** ¹ | HTML×2 | 59% | 61% | 235s | 88K | ✓ |
-| **TVING** ³ | HTML×2 | 47% | 52% | 95s | 115K | ✓ |
-| **Watcha** ⁵ | HTML | 45% | 47% | 105s | 88K | ✓ |
-| **평균** | — | **59.4%** | **63.0%** | **169s** | **88K** | 100% |
+| **Netflix** | PDF | **72.5%** | **79.5%** | 69-76 | 322s | 81K |
+| **Spotify** | HTML | 67.5% | 78.0% | 64-71 | 210s | 89K |
+| **Wavve** ¹ | HTML×2 | 62.5% | 71.0% | 61-64 | 153s | 103K |
+| **Disney+** ⁴ | HTML | 59.0% | 71.0% | 59-59 | 248s | 108K |
+| **TVING** ³ | HTML×2 | 59.0% | 62.5% | 57-61 | 272s | 139K |
+| **Watcha** ⁵ | HTML | 53.0% | 59.0% | 52-54 | 195s | 98K |
+| **Coupang Play** ² | HTML×2 | 52.0% | 53.0% | 52-52 | 457s | 84K |
+| **평균** | — | **60.8%** | **67.7%** | — | **265s** | **100K** |
+
+이전 single-run 베이스라인 대비 **strict +1.4%p / semantic +4.7%p** 평균 개선 — Round 5(BC config)와 Round 6(prompt #1) 누적 효과. 가장 큰 개선은 Watcha(+8/+12%p), TVING(+12/+10.5%p), Disney+(+2/+10%p)로 한국 OTT bool 추론 룰이 적용된 서비스들. Spotify는 동의 메커니즘 일부 흔들림으로 strict 회귀(-5.5%p)했지만 semantic은 동일 유지.
 
 ¹ Wavve는 약관이 `서비스` + `유료상품` 두 문서로 분리. 두 문서 결합 후 측정. 단일 문서로는 57%(strict)에 그침 — pricing 섹션 5/6 missed가 `유료상품` 문서에 있었음.
 
-² Coupang Play도 `이용 기준` + `유료서비스 이용 약관` 두 문서. `coupangplay.com`은 Akamai 차단으로 직접 접근 불가 — React가 띄우는 iframe 원본(`web.coupangstreaming.com/tnc/`)을 직접 받아서 처리.
+² Coupang Play도 `이용 기준` + `유료서비스 이용 약관` 두 문서. `coupangplay.com`은 Akamai 차단으로 직접 접근 불가 — React가 띄우는 iframe 원본(`web.coupangstreaming.com/tnc/`)을 직접 받아서 처리. 결합 fixture에서 over_extraction이 두드러져 strict 52%로 가장 낮음 — `unfair_clause_flags` precision 회복이 핵심.
 
 ³ TVING은 SPA(JS 렌더링 필수) — `m.tving.com/guide/term.tving` 을 Playwright + 모바일 UA로 hydration 대기 후 `유료이용약관` 탭 클릭으로 두 문서 모두 캡처. 다른 서비스 대비 over_extracted=7개(16%)가 두드러짐 — 두 약관을 한 문서에 결합해 cross-doc 추론 오류 가능성.
 
-⁴ Disney+는 SSR로 한국·영문 약관이 한 페이지에 둘 다 노출 — 한글 헤딩(`[이전]디즈니+ 이용 약관(대한민국)`) 마커로 한글 섹션만 추출. terms_changes 100%, pricing/free_trial 83.3% 강점 vs. liability 33% / disputes 25% 약점.
+⁴ Disney+는 SSR로 한국·영문 약관이 한 페이지에 둘 다 노출 — 한글 헤딩(`[이전]디즈니+ 이용 약관(대한민국)`) 마커로 한글 섹션만 추출. prompt #1 적용 후 semantic 61→71%로 가장 큰 점프 (한국 OTT bool 추론 룰의 직접 수혜).
 
-⁵ Watcha는 SSR이지만 free_trial 50%, liability 33%, str 필드 14%로 평균 하회. bool '명시적 부재' 8개 missed가 가장 큰 회귀 요인 — `arbitration/class_action_waiver: False`처럼 명시 부재를 모델이 침묵 처리.
+⁵ Watcha는 SSR이지만 free_trial 50%, liability 33%, str 필드 14%로 평균 하회. prompt #1 적용 전 bool '명시적 부재' 8개 missed였으나 N=2 voting + 한국 OTT 룰 결합으로 +8/+12%p 회복 — 가장 명확한 prompt#1 ROI.
 
 **비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.  
-**현재 갭**: 단일 호출 평균 -10 ~ -14%p (semantic 기준).
+**현재 갭**: BC + prompt#1 평균 -12 ~ -19%p (semantic 67.7% vs 벤치마크 80%). Netflix·Spotify·Wavve·Disney+ 의 semantic은 71-80%로 벤치마크 근접권. Coupang Play / Watcha 가 평균을 끌어내림.
 
 ### 필드 타입별 정확도 (3 서비스 기준 — Spotify · Netflix PDF · Wavve)
 
@@ -96,9 +97,9 @@
 
 ---
 
-## 🔬 실험 결과 정리 (23 runs, 7 configs)
+## 🔬 실험 결과 정리 (30+ runs, Round 1-6)
 
-config 매트릭스 비교 ([scripts/run_experiments.py](scripts/run_experiments.py)):
+### Round 1-4: config matrix (Netflix PDF 기준, 23 runs)
 
 | Config | Runs | Acc 평균 | 범위 | Std | Sec | Tokens |
 |---|---|---|---|---|---|---|
@@ -110,16 +111,39 @@ config 매트릭스 비교 ([scripts/run_experiments.py](scripts/run_experiments
 | F (N=5, medium) | 1 | 66.0% | — | — | 419 | 131K |
 | **G (N=2, medium)** ⭐ | **7** | **71.6%** | 66-80 | 4.9 | 222 | 70K |
 
-**Winner: G (N=2 majority voting + medium reasoning)**
-- C(N=3) 대비 시간 **-28%**, 토큰 **-24%**, 정확도 **+5.8%p**
-- 비용/정확도 sweet spot
+→ **Winner: G (N=2 majority voting + medium reasoning)**. C(N=3) 대비 시간 -28%, 토큰 -24%, 정확도 +5.8%p.
+
+### Round 5: per-stage reasoning_effort 튜닝 (BC config, 5 runs/config)
+
+`extract` 외 단계 reasoning_effort 영향 측정:
+
+| Config | extract | summarize | ground | Acc 평균 | Sec | 비고 |
+|---|---|---|---|---|---|---|
+| baseline | medium | minimal | low | 71.6% | 222 | Round 1-4 G config |
+| B only | medium | high | low | 73.2% | 263 | summarize ↑ |
+| C only | medium | minimal | medium | 72.8% | 251 | ground ↑ |
+| **B+C** ⭐ | **medium** | **high** | **medium** | **74.7%** | 268 | **둘 다 ↑** |
+
+→ B+C 채택 — summarize/ground 모두 reasoning_effort ↑가 추출 단계와 무관하게 종합 정확도 향상.
+
+### Round 6: prompt #1 (한국 OTT bool 추론 룰)
+
+`prompts/extract_subscription.py` 에 "한국 OTT 약관에서 arbitration / class_action_waiver / damages_cap_present 등은 한국 강행규정에 의해 적용되지 않으므로 명시 부재 시 `False, inferred`" 룰 추가:
+
+| Config | Service | Acc 평균 | 비고 |
+|---|---|---|---|
+| BC | Netflix PDF | 74.7% | baseline |
+| **BC + prompt #1** ⭐ | **Netflix PDF** | **79.7%** (peak 83%) | **+5%p** |
+
+→ 한국 OTT 6/7 fixtures에서 bool '명시적 부재' missed가 4-8개 → 0-3개로 회복.
 
 ### 발견된 counter-intuitive 패턴
 
-1. **`reasoning_effort: medium > high`** — high가 reasoning path 다양해서 voting과 충돌. medium이 일관성 ↑로 voting 효과 극대화.
-2. **N=2 voting ≈ N=3 voting**: 추가 voting의 diminishing returns. N=5는 효과 미미.
-3. **low reasoning effort는 45%로 망함**: 단순 작업도 아님.
-4. **temperature=0인데도 ±5%p 변동성**: Solar API의 비-결정성 잔존. N=5 sample 평균 권장.
+1. **`reasoning_effort: medium > high` (extract 단계)** — high가 reasoning path 다양해서 voting과 충돌. medium이 일관성 ↑로 voting 효과 극대화.
+2. **`reasoning_effort: high` (summarize/ground 단계)** — 단일 호출 단계는 voting 보호가 없어 reasoning 깊이가 직접 정확도 견인. extract와 정반대 처방.
+3. **N=2 voting ≈ N=3 voting**: 추가 voting의 diminishing returns. N=5는 효과 미미.
+4. **temperature=0인데도 ±5%p 변동성**: Solar API의 비-결정성 잔존. 최소 N=2 sample 평균 권장.
+5. **prompt 도메인 사전 지식 > config 튜닝**: BC config로 +3.1%p 얻은 후 prompt #1으로 +5%p 추가. 모델에게 *한국 약관 컨텍스트*를 명시하는 효과가 reasoning_effort/voting의 generic 튜닝보다 컸음.
 
 ---
 
@@ -210,10 +234,23 @@ uvicorn app.main:app --reload
 # → data/experiments/experiments_<timestamp>.{json,md}
 ```
 
+### 7 서비스 일괄 측정
+
+```bash
+# 모든 fixture × N runs (병렬 동시성 3) → aggregate report
+.venv/bin/python scripts/run_all_fixtures.py 2 3
+# → data/experiments/all_fixtures_<timestamp>.{json,md}
+```
+
+다중 API 키 (`UPSTAGE_API_KEY_2..4`)를 `.env`에 추가하면 자동으로 라운드로빈 분배 — 키 K개면 동시 fixture 수 ~K× 증가.
+
 ### 환경 변수
-- `UPSTAGE_API_KEY` — Upstage 인증
+- `UPSTAGE_API_KEY` — Upstage 인증 (필수)
+- `UPSTAGE_API_KEY_2..4` — 선택, run_all_fixtures.py 가 자동 분배
 - `EXTRACT_ENSEMBLE_N` — voting N (default 2)
 - `EXTRACT_REASONING_EFFORT` — high/medium/low (default medium)
+- `SUMMARIZE_REASONING_EFFORT` — high/medium/low (default high) — Round 5 결과
+- `GROUND_REASONING_EFFORT` — high/medium/low (default medium) — Round 5 결과
 
 ---
 
@@ -224,8 +261,9 @@ uvicorn app.main:app --reload
 | `data/fixtures/*_golden.json` | 사람 라벨된 정답 데이터 (Netflix v0.2 50필드, Spotify v1, Wavve v1, Coupang Play v0.2, TVING v0.2, Watcha v0.2, Disney+ v0.2) |
 | `data/fixtures/*_terms.html` | 약관 원본 HTML (Spotify · Wavve · Coupang Play · TVING · Netflix · Watcha · Disney+) — gitignored, [data/fixtures/README.md](data/fixtures/README.md) 참고 |
 | `data/fixtures/*_run_baseline.json` | 단일 호출 추출 결과 |
-| `data/experiments/experiments_*.{json,md}` | 23회 실험 raw 데이터 + 자동 리포트 |
-| `data/experiments/aggregate_summary.md` | 3 round 종합 분석 |
+| `data/experiments/experiments_*.{json,md}` | 23회 실험 raw 데이터 + 자동 리포트 (Round 1-4) |
+| `data/experiments/all_fixtures_*.{json,md}` | 7 fixture × N runs 일괄 측정 raw + 자동 리포트 (Round 5-6) |
+| `data/experiments/aggregate_summary.md` | Round 1-6 종합 분석 |
 | `docs/superpowers/specs/2026-05-13-ie-schema-subscription-design.md` | IE 스키마 설계 스펙 |
 | `docs/superpowers/plans/2026-05-13-ie-pipeline-implementation.md` | 13-task 구현 계획 |
 | `scripts/eval_variance.py` | N회 호출 변동성 측정 |
@@ -282,16 +320,17 @@ uvicorn app.main:app --reload
 ### 그 외 다음 우선순위
 
 1. **Schema 확장**: ConsentMechanism enum + jurisdiction multi-region 구조 + Codex 추천 신규 필드 (`app_store_billing_dependency`, `dormant_account_policy` 등)
-2. **G config × 5+ runs**: 71.6% 평균의 신뢰도 확정 (7 서비스 신규 fixture 들도 G config로 재측정 필요)
+2. **BC + prompt#1 × 5+ runs**: 현재 7 서비스 평균 60.8% strict / 67.7% semantic 의 신뢰구간 확정 (현재는 N=2 평균이라 ±5%p variance 잔존)
 3. **다른 fixture 추가**: ~~Tving~~ / ~~쿠팡플레이~~ / ~~Watcha~~ / ~~Disney+~~ (완료) / Apple TV+ / Laftel / Twip 등
-4. **str semantic 임계값 튜닝**: 현재 SequenceMatcher 0.5 — embedding 기반 의미 비교로 업그레이드 가능
-5. **disputes 섹션 prompt 보강**: region-specific 조항 추출하도록
+4. **str semantic 임계값 튜닝**: 현재 SequenceMatcher 0.4 — embedding 기반 의미 비교 (multilingual-MiniLM)로 업그레이드 가능
+5. **disputes 섹션 prompt 보강**: region-specific 조항 추출하도록 (Spotify의 USA-style 중재 조항 캐치)
 
 ---
 
 ## 📚 관련 문서
 
-- [전체 종합 분석](data/experiments/aggregate_summary.md) — 23 runs / 7 configs / 3 services
+- [전체 종합 분석](data/experiments/aggregate_summary.md) — Round 1-6 / 7 configs / 7 services
+- [7 fixture 일괄 결과](data/experiments/all_fixtures_20260515_014511.md) — BC + prompt#1 default 14 runs
 - [IE 스키마 설계 스펙](docs/superpowers/specs/2026-05-13-ie-schema-subscription-design.md)
 - [구현 계획](docs/superpowers/plans/2026-05-13-ie-pipeline-implementation.md)
 

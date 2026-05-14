@@ -7,6 +7,7 @@ HTML 파일은 .gitignore 되어 있어 각 환경에서 이 스크립트로 재
     .venv/bin/python scripts/fetch_public_terms.py netflix    # (수동: PDF 다운로드 안내만 출력)
     .venv/bin/python scripts/fetch_public_terms.py spotify    # Spotify Korea ToS 자동 추출
     .venv/bin/python scripts/fetch_public_terms.py wavve      # Wavve API 직접 호출
+    .venv/bin/python scripts/fetch_public_terms.py claude     # Anthropic consumer + privacy
     .venv/bin/python scripts/fetch_public_terms.py all        # spotify + wavve
 """
 
@@ -80,6 +81,49 @@ def fetch_wavve() -> None:
     print(f"  → wavve_terms.html ({versions}, total {total:,} chars)")
 
 
+def _extract_anthropic_article(html: str, url: str) -> str:
+    """Anthropic 법무 페이지에서 <article class="...legal-page"> 본문만 추출."""
+    m = re.search(
+        r'(<article[^>]*LegalPageDetail-module[^>]*legal-page[^>]*>.*?</article>)',
+        html,
+        re.DOTALL,
+    )
+    if not m:
+        raise RuntimeError(f"Anthropic: legal-page article not found at {url} (page structure changed?)")
+    return m.group(1)
+
+
+def fetch_claude() -> None:
+    """Anthropic Consumer Terms + Privacy Policy 결합.
+
+    Wavve 패턴과 동일 — 구독 조항(consumer terms §6)과 데이터 학습/보존 조항
+    (privacy §1, §6)이 다른 문서에 분산. 한쪽만 가져오면 data_usage 섹션 손실.
+    """
+    docs = []
+    for slug, title in (
+        ("consumer-terms", "Consumer Terms of Service"),
+        ("privacy", "Privacy Policy"),
+    ):
+        url = f"https://www.anthropic.com/legal/{slug}"
+        html = _get(url).decode("utf-8", errors="ignore")
+        article = _extract_anthropic_article(html, url)
+        docs.append((title, url, article))
+
+    body_parts = [
+        f"<hr><h1>Anthropic {title}</h1>\n<p><em>Source: {url}</em></p>\n{article}\n"
+        for title, url, article in docs
+    ]
+    wrapped = (
+        '<!DOCTYPE html>\n<html lang="en"><head><meta charset="UTF-8">'
+        '<title>Anthropic Consumer Terms + Privacy Policy</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
+    )
+    out = FIXTURE_DIR / "claude_terms.html"
+    out.write_text(wrapped, encoding="utf-8")
+    total = sum(len(a) for _, _, a in docs)
+    print(f"  → claude_terms.html ({len(docs)} docs, total {total:,} chars)")
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
@@ -96,6 +140,9 @@ def main():
     elif service == "wavve":
         print("Fetching Wavve service agreement...")
         fetch_wavve()
+    elif service == "claude":
+        print("Fetching Anthropic Consumer Terms + Privacy Policy...")
+        fetch_claude()
     elif service == "all":
         print("Fetching Spotify + Wavve...")
         fetch_spotify()
