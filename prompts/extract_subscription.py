@@ -21,16 +21,43 @@ SYSTEM_PROMPT = """\
    - 예: "집단소송에 대해 약관에 언급 없음" → class_action_waiver는 "not_specified"
    - 예: "본 약관은 집단소송 권리를 제한하지 않습니다" → class_action_waiver=False, "confirmed"
 
-   ⚠️ **한국 OTT 약관에서 일반적으로 적용되지 않는 항목 — 침묵 = False(inferred)**:
-   한국 OTT(Wavve, Tving, Netflix Korea 등) 약관은 한국 강행규정에 의해 다음 항목들이
-   기본적으로 *적용되지 않음*. 본문에 해당 항목을 *적용한다*는 명시적 진술이 없으면
-   `value=False`, `uncertainty="inferred"`, citation은 한국법 적용 조항 또는 분쟁 해결 섹션을 인용.
-   - `disputes.arbitration_required`: "중재", "중재로 해결", "중재 의무" 같은 표현이 없으면 → False, inferred.
-     (한국 강행규정상 의무 중재 조항은 일반적으로 인정 안 됨.)
-   - `disputes.class_action_waiver`: "집단소송 포기", "집단소송 권리 제한" 같은 표현이 없으면 → False, inferred.
-     (한국 집단소송 제도 자체가 제한적이라 명시 부재 = 적용 없음.)
+   ⚠️ **도메인 인식 (모델이 적용할 룰 결정 — 가장 먼저 판단)**:
+   본문 첫 1~2조항을 보고 서비스 도메인을 판정한 뒤, 도메인별 룰을 적용합니다.
+   - **OTT/구독 (스트리밍·콘텐츠 멤버십)**: "동영상 스트리밍", "구독", "월정액", "콘텐츠 서비스" 등이 첫 조항에 등장.
+     → 아래 "OTT 침묵=False(inferred)" 룰 적용.
+   - **Fintech/전자금융 (결제·송금·PG·PFM)**: "전자금융거래", "선불전자지급수단", "결제대행", "송금", "자산관리"가 등장,
+     또는 "전자금융거래법", "여신전문금융업법", "금융위원회" 인용.
+     → 아래 "Fintech 보수적 추출" 룰 적용 (OTT inferred 룰 *적용 금지*).
+   - **기타 (전자상거래·중개·플랫폼)**: 위 둘에 해당하지 않음. 한국 강행규정 inferred 룰은 *명시적 단서가 있을 때만* 사용.
+
+   ⚠️ **[OTT 한정] 한국 OTT 약관에서 일반적으로 적용되지 않는 항목 — 침묵 = False(inferred)**:
+   *도메인이 OTT로 판정된 경우에만* 다음 inferred 룰을 사용. fintech/기타에는 적용 금지.
+   - `disputes.arbitration_required`: "중재", "중재로 해결", "중재 의무" 표현 없으면 → False, inferred.
+   - `disputes.class_action_waiver`: "집단소송 포기", "집단소송 권리 제한" 표현 없으면 → False, inferred.
    - `liability.damages_cap_present`: 손해배상 한도 금액/배수가 본문에 없으면 → False, inferred.
-     (단, "특별한 사정으로 통상적인 범위를 벗어나는 손해는 책임지지 않습니다" 같은 한도 표현이 있으면 True.)
+     (단, "통상적인 범위를 벗어나는 손해는 책임지지 않습니다" 같은 한도 표현이 있으면 True.)
+
+   ⚠️ **[Fintech 한정] 보수적 추출 룰 — over-inference 방지**:
+   *도메인이 fintech로 판정된 경우*, 아래 룰을 적용. **단 사례 E (소프트 부정 패턴) 가 있으면 그 룰이 우선** — 소프트 부정 표현(`통상적인 범위를 벗어나는 손해는 책임지지 않습니다` 등)이 본문에 있으면 사례 E 그대로 적용 (damages_cap_present=True 등).
+
+   **다음 필드들은 *명시적 한도/제외 표현이 없을 때만* not_specified 처리**:
+   - `liability.damages_cap_present`:
+     · 본문에 "한도", "이상은 책임지지 않음", "최대 N만원", **"통상적인 범위를 벗어나는"**, **"특별손해", "간접손해"** 등 한도성 표현이 있으면 → **True, "confirmed"** (사례 E 우선).
+     · 위 표현이 *전혀 없으면* → **not_specified** (False inferred 금지).
+   - `liability.indirect_damages_excluded`:
+     · "간접손해", "특별손해", "결과적 손해", "이익 상실", "통상적인 범위를 벗어나는" 등 명시적 제외 표현이 있으면 → True, "confirmed".
+     · 전혀 없으면 → **not_specified**.
+   - `liability.force_majeure_scope`:
+     · "불가항력", "force majeure", "천재지변에 준하는" 명시적 force majeure *책임 면제 정의 조항*이 있을 때만 추출.
+     · 단순한 *사유 나열* (천재지변/전쟁/DDOS — 사후 통지/공지 갈음 조항 안에서 나오는 경우 등) → not_specified.
+   - `data_usage.collected_categories`/`third_party_recipients`/`marketing_use`:
+     · 본 약관이 "별도 개인정보처리방침에 따른다"고 명시하면 → **not_specified** (사례 D — 외부 문서 위임).
+
+   **다음 필드들은 한국 fintech도 OTT와 동일하게 inferred False 적용** (한국 강행규정 표준):
+   - `disputes.arbitration_required`: "중재" 표현이 본문에 없으면 → **False, inferred** (한국법상 의무 중재 일반 인정 안 됨).
+   - `disputes.class_action_waiver`: "집단소송 포기/제한" 표현이 없으면 → **False, inferred** (한국 집단소송 제한적이라 명시 부재 = 미적용).
+   - `disputes.governing_law`: 본문에 "준거법" 조항이 있으면 그대로 추출, 없으면 → **대한민국 법률, inferred** (한국 사업자 fintech 표준).
+   - `disputes.jurisdiction_clause`: "관할법원" 조항이 있으면 그대로 추출, 없으면 → **민사소송법상 관할법원, inferred**.
 
    ⚠️ **별도 정책/문서 참조 패턴 (특히 개인정보·결제·앱마켓)**:
    - 약관이 "자세한 사항은 [개인정보처리방침/별도 정책/관련 정책]을 참고하시기 바랍니다",
@@ -114,12 +141,33 @@ SYSTEM_PROMPT = """\
 - "통상적인 범위를 벗어나는 손해는 ... 책임지지 않습니다" ⇒ 손해배상 한도 + 간접손해 제외 (둘 다 True)
 - "노력합니다" 만으로는 보장 의무 없음을 시사 — 보장 부재로 해석 가능
 
+## 사례 F — Fintech 전자금융거래법 (EFTA) 패턴
+입력 발췌 1: "회사는 회원의 고의 또는 중과실로 인한 손해에 대하여는 책임을 부담하지 아니합니다. 다만, 회사의 고의 또는 중과실로 인하여 회원에게 손해가 발생한 경우 회사는 그 손해를 배상할 책임이 있습니다."
+입력 발췌 2: "회사는 천재지변, 전쟁, 폭동, 테러, 해킹, DDOS 등 사유로 불가피하게 사전 공지를 할 수 없는 경우에는 사후 통지로 갈음할 수 있습니다."
+
+판정:
+- liability.service_disruption_compensation.value = False, "confirmed" — "회사의 고의·중과실" 외에는 책임 부재 (전자금융거래법 §9 표준 패턴)
+- liability.compensation_description.value = "회사의 고의·중과실로 인한 손해는 배상, 그 외 책임 부담 안 함", "confirmed"
+- liability.damages_cap_present.value = **not_specified** — 명시적 한도/배수 조항이 없음 (위 발췌는 *책임 분배*이지 *한도*가 아님)
+- liability.damages_cap_description = null
+- liability.force_majeure_scope = **not_specified** — 발췌 2는 *사후 통지 갈음* 조항이지 force majeure *책임 면제* 정의가 아님. force majeure 면제 조항이 없으면 not_specified.
+- liability.indirect_damages_excluded = **not_specified** — "간접손해/특별손해" 명시적 제외 표현이 없으면 not_specified.
+
+**Fintech 핵심 차이점 (OTT와 비교)**:
+- *책임 분배 조항* (회사 vs 이용자 vs 제3자)을 *한도 조항*과 혼동 금지. fintech 약관은 책임을 *분배*하지 *총량 한도를 두지 않는다*.
+- *사유 나열* (천재지변·DDOS·해킹 등)이 *force majeure 정의*와 다름. force majeure 면제 조항이 없으면 not_specified.
+- *고의·중과실 책임* 패턴 (전자금융거래법 §9)이 OTT의 "고의 또는 과실로 손해 배상"보다 *좁은 범위* — `compensation_description`에 이 차이를 반영.
+
 위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E 판정 기준을 적용하세요.
-특히 사례 D (명시적 부재) + 사례 E (소프트 부정 — 책임 제한 영역)을 약관 전체에 일관되게 적용하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E/F 판정 기준을 적용하세요.
+
+**작업 흐름**:
+1. 먼저 본문 첫 1~2조항을 보고 **도메인을 판정** (OTT/Fintech/기타) — 시스템 프롬프트의 "도메인 인식" 룰 참고.
+2. 도메인에 맞는 inferred 룰만 적용 (OTT면 OTT 룰, fintech면 보수적 룰).
+3. 사례 D (명시적 부재) + 사례 E (소프트 부정) + 사례 F (fintech EFTA 패턴) 을 약관 전체에 일관되게 적용.
 
 서비스: {service_name} ({service_provider})
 

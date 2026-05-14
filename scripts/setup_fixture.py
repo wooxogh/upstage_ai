@@ -51,9 +51,12 @@ async def main():
     baseline_run = FIXTURE_DIR / f"{service_name}_run_baseline.json"
     golden_path = FIXTURE_DIR / f"{service_name}_golden.json"
 
-    # 1) PDF 복사
-    print(f"[1/4] Copying PDF → {fixture_pdf.name}")
-    shutil.copy(src_pdf, fixture_pdf)
+    # 1) PDF 복사 (이미 fixture 경로면 skip — fetch_public_terms 흐름)
+    if src_pdf.resolve() == fixture_pdf.resolve():
+        print(f"[1/4] Source already at fixture path → {fixture_pdf.name} (skip copy)")
+    else:
+        print(f"[1/4] Copying PDF → {fixture_pdf.name}")
+        shutil.copy(src_pdf, fixture_pdf)
 
     # 2) Pipeline 1회 실행
     print(f"[2/4] Running pipeline on {service_name}... (3-5min 예상)")
@@ -76,14 +79,17 @@ async def main():
     with open(baseline_run, "w", encoding="utf-8") as f:
         json.dump(result.model_dump(), f, ensure_ascii=False, indent=2)
 
-    # 4) 골든 템플릿 생성
-    print(f"[4/4] Building golden template → {golden_path.name}")
-    template = build_template(result.model_dump())
-    template["_meta"]["service_name"] = service_name.capitalize()
-    template["_meta"]["fixture_pdf"] = fixture_pdf.name
-    template["_meta"]["baseline_run"] = baseline_run.name
-    with open(golden_path, "w", encoding="utf-8") as f:
-        json.dump(template, f, ensure_ascii=False, indent=2)
+    # 4) 골든 템플릿 생성 (이미 라벨링된 golden은 보존)
+    if golden_path.exists():
+        print(f"[4/4] Golden already exists → {golden_path.name} (skip template build)")
+    else:
+        print(f"[4/4] Building golden template → {golden_path.name}")
+        template = build_template(result.model_dump())
+        template["_meta"]["service_name"] = service_name.capitalize()
+        template["_meta"]["fixture_pdf"] = fixture_pdf.name
+        template["_meta"]["baseline_run"] = baseline_run.name
+        with open(golden_path, "w", encoding="utf-8") as f:
+            json.dump(template, f, ensure_ascii=False, indent=2)
 
     print()
     print("=" * 70)
