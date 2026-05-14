@@ -68,6 +68,12 @@ _ENUM_ALIAS_GROUPS = [
     {"prorated", "prorated_refund"},             # 일할 환불 (스키마 정합 차이)
     {"opt_out_available", "opt_out"},            # 옵트아웃 (축약형)
     {"opt_in_explicit", "opt_in_required"},      # 옵트인 (스키마 정합 차이)
+    # str governing_law/jurisdiction은 list_vocab이 아닌 별도 alias 그룹으로 처리
+    {"California law", "California, USA", "미국 캘리포니아주 법률", "캘리포니아 주법"},
+    {"Delaware law", "Delaware, USA", "미국 델라웨어주 법률"},
+    {"Sweden law", "Swedish law", "스웨덴 법률"},
+    {"대한민국 법률", "대한민국 법", "한국 법률", "Korean law", "Republic of Korea law"},
+    {"민사소송법상 관할법원", "민사소송법 관할법원", "민사소송법에 따른 관할법원"},
 ]
 
 
@@ -89,12 +95,20 @@ _LIST_VOCAB_GROUPS = [
     {"sellers", "판매자", "판매업체", "위탁사", "위탁업체"},
     {"shipping_carriers", "배송업체", "배송사", "배송 회사"},
     {"affiliates", "계열사", "관계사"},
-    {"payment_processors", "결제대행사", "쿠팡페이"},
+    {"payment_processors", "결제대행사", "쿠팡페이", "payment processor", "payment processors", "billing provider"},
+    # AI 도메인 vocab
+    {"service_providers", "service providers", "위탁사", "service provider", "third-party service providers"},
+    {"hosting_providers", "hosting providers", "클라우드 호스팅", "infrastructure providers"},
+    {"model_training", "model training", "AI 학습", "학습 데이터 활용", "training data use", "improving our models"},
+    {"regulators", "regulators", "정부기관", "law enforcement", "governmental authorities"},
+    {"user_data_aggregators", "analytics providers", "분석 제공자", "data analytics partners"},
     # 목적
     {"transaction_fulfillment", "거래/배송", "거래 및 배송", "거래 이행", "billing settlement", "결제 정산"},
-    {"fraud_prevention", "부정행위 확인", "부정행위 방지", "본인확인"},
-    {"marketing", "마케팅", "광고", "프로모션"},
-    {"service_delivery", "서비스 제공", "서비스 위탁"},
+    {"fraud_prevention", "부정행위 확인", "부정행위 방지", "본인확인", "abuse prevention", "security"},
+    {"marketing", "마케팅", "광고", "프로모션", "promotional", "advertising"},
+    {"service_delivery", "서비스 제공", "서비스 위탁", "operate the service", "provide services"},
+    {"model_improvement", "model improvement", "improving services", "research and development", "모델 개선", "서비스 개선"},
+    {"legal_compliance", "legal compliance", "법령 준수", "법적 의무"},
     # 채널
     {"email", "이메일", "전자우편"},
     {"sms", "문자메시지", "문자"},
