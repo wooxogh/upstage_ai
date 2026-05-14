@@ -13,23 +13,36 @@
 
 ---
 
-## 📊 성능 평가 (3 서비스, 사람 라벨 기준)
+## 📊 성능 평가 (7 서비스, 사람 라벨 기준)
 
-3개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 단일 호출 정확도:
+7개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 단일 호출 정확도:
 
 | 서비스 | 형식 | Strict | Semantic | 추출 시간 | 토큰 | grounded |
 |---|---|---|---|---|---|---|
 | **Spotify** | HTML | **73%** | **80%** | 224s | 85K | ✓ |
 | **Netflix** | PDF | 69% | 71% | 308s | 92K | ✓ |
+| **Coupang Play** ² | HTML×2 | 64% | 66% | 77s | 74K | ✓ |
+| **Netflix** | HTML | 61% | 66% | 191s | 62K | ✓ |
+| **Disney+** ⁴ | HTML | 57% | 61% | 115s | 102K | ✓ |
 | **Wavve** ¹ | HTML×2 | 59% | 61% | 235s | 88K | ✓ |
-| **평균** | — | **67.0%** | **70.7%** | **256s** | **88K** | 100% |
+| **TVING** ³ | HTML×2 | 47% | 52% | 95s | 115K | ✓ |
+| **Watcha** ⁵ | HTML | 45% | 47% | 105s | 88K | ✓ |
+| **평균** | — | **59.4%** | **63.0%** | **169s** | **88K** | 100% |
 
 ¹ Wavve는 약관이 `서비스` + `유료상품` 두 문서로 분리. 두 문서 결합 후 측정. 단일 문서로는 57%(strict)에 그침 — pricing 섹션 5/6 missed가 `유료상품` 문서에 있었음.
+
+² Coupang Play도 `이용 기준` + `유료서비스 이용 약관` 두 문서. `coupangplay.com`은 Akamai 차단으로 직접 접근 불가 — React가 띄우는 iframe 원본(`web.coupangstreaming.com/tnc/`)을 직접 받아서 처리.
+
+³ TVING은 SPA(JS 렌더링 필수) — `m.tving.com/guide/term.tving` 을 Playwright + 모바일 UA로 hydration 대기 후 `유료이용약관` 탭 클릭으로 두 문서 모두 캡처. 다른 서비스 대비 over_extracted=7개(16%)가 두드러짐 — 두 약관을 한 문서에 결합해 cross-doc 추론 오류 가능성.
+
+⁴ Disney+는 SSR로 한국·영문 약관이 한 페이지에 둘 다 노출 — 한글 헤딩(`[이전]디즈니+ 이용 약관(대한민국)`) 마커로 한글 섹션만 추출. terms_changes 100%, pricing/free_trial 83.3% 강점 vs. liability 33% / disputes 25% 약점.
+
+⁵ Watcha는 SSR이지만 free_trial 50%, liability 33%, str 필드 14%로 평균 하회. bool '명시적 부재' 8개 missed가 가장 큰 회귀 요인 — `arbitration/class_action_waiver: False`처럼 명시 부재를 모델이 침묵 처리.
 
 **비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.  
 **현재 갭**: 단일 호출 평균 -10 ~ -14%p (semantic 기준).
 
-### 필드 타입별 정확도 (3 서비스 평균)
+### 필드 타입별 정확도 (3 서비스 기준 — Spotify · Netflix PDF · Wavve)
 
 | Type | 정확도 | 비고 |
 |---|---|---|
@@ -57,6 +70,27 @@
 - `terms_changes.notice_lead_time_days: 7` — Netflix 30일 대비 **4배 짧음** ⚠️
 - `marketing_consent: opt_out_available` — 마케팅 활용 거부 가능
 - `force_majeure_scope`: "천재지변 또는 이에 준하는 불가항력" (전통적 한국 약관 표현)
+
+**Coupang Play (한국, 쿠팡 자회사)**
+- `data_usage` 섹션 **100% 정확** (한국 서비스 중 최고) — 개인정보 항목이 모회사 쿠팡 표준 약관 패턴을 따라 구조화 명확
+- str 필드 5/7 wrong — `cancellation.method_description` 등 자유 텍스트가 모회사 약관 인용 형식이라 paraphrase 갭 큼
+- `unfair_clause_flags` 8개 중 1개만 검출 (recall 0.12) — `환불 거부 (시청 시 청약철회 권리 소멸)` 같은 다크패턴 미포착
+
+**TVING (한국, CJ ENM 자회사)**
+- 두 약관(서비스+유료) 한 fixture 결합 → **over_extracted=7개**가 두드러짐. 모델이 cross-doc 추론을 시도해 골든에 없는 답을 만들어냄
+- `liability` 33%, `data_usage` 37.5% — 다른 한국 서비스 평균 대비 낮음
+- `unfair_clause_flags` 5개 중 1개만 검출 — `다크패턴 — 해지 절차 복잡화`, `약관 일방 변경권` 등 핵심 항목 누락
+
+**Disney+ (글로벌, 한국 별도 약관)**
+- 🚨 `damages_cap_present: True` + 한도 **100만원** — 글로벌 OTT 최저 수준 손배 한도 (Netflix 무한도 대비)
+- `governing_law: 대한민국 법률` + `jurisdiction_clause: 서울` — Spotify와 달리 한국법 친화적 (월트디즈니컴퍼니코리아 법인 운영)
+- `auto_renewal_consent` 추출이 한국 서비스 패턴(opt_in)과 글로벌 패턴(opt_out) 사이에서 혼동 — 가입 동의/취소 통로가 서로 다른 단계에 있어서 모델 해석에 흔들림
+- terms_changes **100%**: "30일 사전 통지 + 명시적 동의" 명시가 매우 명확
+
+**Watcha (한국, 가장 명확한 약관 구조)**
+- 🚨 `cancellation.penalty_description`: 중도 해지 시 결제금액 **10% 위약금 명시** (한국 OTT 중 유일하게 계산식까지 노출)
+- 🚨 `marketing_consent: opt_in_required` — Netflix/Wavve의 opt_out_available 대비 사용자 권리 더 명확
+- 추출 한계: `disputes` 25%·`liability` 33%·str 14% — 결국 같은 패턴 (자유 텍스트 paraphrase + bool 명시적 부재 식별 한계)
 
 이러한 cross-service 비교는 소비자가 가입 전 검토 시 즉시 보이는 차별점을 드러냄.
 
@@ -187,7 +221,8 @@ uvicorn app.main:app --reload
 
 | 위치 | 내용 |
 |---|---|
-| `data/fixtures/*_golden.json` | 사람 라벨된 정답 데이터 (Netflix v0.2 50필드, Spotify v1, Wavve v1) |
+| `data/fixtures/*_golden.json` | 사람 라벨된 정답 데이터 (Netflix v0.2 50필드, Spotify v1, Wavve v1, Coupang Play v0.2, TVING v0.2, Watcha v0.2, Disney+ v0.2) |
+| `data/fixtures/*_terms.html` | 약관 원본 HTML (Spotify · Wavve · Coupang Play · TVING · Netflix · Watcha · Disney+) — gitignored, [data/fixtures/README.md](data/fixtures/README.md) 참고 |
 | `data/fixtures/*_run_baseline.json` | 단일 호출 추출 결과 |
 | `data/experiments/experiments_*.{json,md}` | 23회 실험 raw 데이터 + 자동 리포트 |
 | `data/experiments/aggregate_summary.md` | 3 round 종합 분석 |
@@ -210,11 +245,45 @@ uvicorn app.main:app --reload
 5. **`unfair_clause_flags` controlled vocab**: 사용자 라벨이 `POST-01`, `면책/손배 제한`, `약관 일방 변경권` 등 혼합 표기 → 모델 출력과 매칭 precision 1.0이지만 recall 25-33%.
 6. **다중 문서 약관 (Wavve case)**: Wavve는 `서비스 이용약관` + `유료상품 이용약관` 두 문서로 분리. 초기에 service만 처리해 pricing 5/6 missed(=17%). 두 문서 결합 후 pricing 50%로 회복(+33%p). Tving·Watcha 등도 동일 구조 가능 → fixture 추가 시 다중 문서 확인 필요.
 
-### 다음 우선순위
+### 7 서비스 누적 데이터에서 보이는 개선 기회 (우선순위 순)
+
+7개 서비스 × 42 필드 = 294 sample 누적 후 드러난 *반복 발생* 패턴. 단일 fixture에서는 안 보이는 시스템적 갭이라 prompt/scoring 양쪽 개입이 필요.
+
+1. **bool '명시적 부재' → False 강제 (가장 영향 큰 단일 fix 예상, +5~8%p 추정)**
+   - **증상**: `disputes.arbitration_required`, `class_action_waiver`, `liability.damages_cap_present` 등의 bool이 7개 서비스 중 **6개**에서 `missed` (모델이 null 반환). 한국 OTT 6개는 중재/집단소송 자체를 약관에서 다루지 않음 → 정답은 `False`인데 모델은 침묵을 null로 해석.
+   - **현상 진단**: `prompts/extract_subscription.py:88` 의 "명시적 부재 vs 침묵" 가이던스가 *국제 분쟁 절차*는 한국 약관 컨텍스트에서 *항상* 부재라는 사전 지식을 모델에 주지 못함.
+   - **수정 방향**: disputes/liability 섹션 프롬프트에 "한국 사업자 약관에 arbitration/class_action 조항이 없으면 `False, confirmed`" 룰 명시. 평균 4 missed × 7 서비스 = 28 missed 중 20개 회복 가능.
+
+2. **`unfair_clause_flags` controlled vocab 매칭 (Disney+ precision 0의 근본 원인)**
+   - **증상**: Disney+의 모델 출력 `면책/손배 제한`이 골든 `면책/손배 제한 (100만원 한도)`과 strict 매칭 실패로 precision=0. 의미는 동일.
+   - **수정 방향**:
+     - 단기: `scripts/score_against_golden.py:226` 의 flags 비교에 *괄호 제거 + 토큰 정규화* 후 set 비교 적용. precision/recall 둘 다 즉시 회복.
+     - 중기: `prompts/extract_subscription.py` 의 flag 가이드를 닫힌 vocabulary 표로 고정 (`POST-01` ~ `POST-05` + 5개 한글 표준명) — 모델 출력 정규화.
+
+3. **`data_usage.third_party_recipients` / `purposes` 리스트 missed**
+   - **증상**: Watcha (3 missed), Disney+ (2 missed), Netflix HTML (4 missed) — 약관 본문에 명시된 list가 모델이 *문장 단위로만* 보고 list 항목으로 못 묶음. Disney+에서 "월트디즈니 계열사", "법집행기관" 등 명백히 적힌 리스트.
+   - **수정 방향**: `prompts/extract_subscription.py` 의 `data_usage` 섹션에 *list 추출 예시* 추가 ("...에게 제공할 수 있습니다. ① X ② Y ③ Z" → `[X, Y, Z]`). 추출 변환 패턴 1개 추가로 7개 서비스 모두 영향.
+
+4. **str semantic threshold 0.5 → 0.4 (또는 embedding 기반)**
+   - **증상**: Disney+ `jurisdiction_clause`: 골든 `대한민국 서울의 관할법원` vs 모델 `서울, 대한민국` — 의미 동일, SequenceMatcher 0.32. semantic 기준에서도 `wrong`.
+   - **수정 방향**:
+     - 단기: `scripts/score_against_golden.py:57` 의 `SEMANTIC_STR_THRESHOLD = 0.5` → `0.4`. 검증: 거짓 정답 증가 여부 sample 5개로 확인.
+     - 중기: `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` 임베딩으로 cosine ≥ 0.7 매칭. 한국어 paraphrase에 robust.
+   - **기대 효과**: str 필드 14-43% → 50%+ (across-the-board).
+
+5. **`auto_renewal_consent` enum 일관성 (한국 vs 글로벌 패턴 충돌)**
+   - **증상**: Watcha와 Disney+ 모두 골든 `opt_out_available` vs 모델 `opt_in_explicit`. 가입 시 *동의 체크박스*가 있다고 해서 `opt_in_explicit`로 해석하면 한국 약관 표준 (자동갱신=기본, 해지로 opt-out)이 무너짐.
+   - **수정 방향**: `prompts/extract_subscription.py` 의 ConsentMechanism 결정 흐름에 룰 추가: "가입 시 동의 ≠ 자동갱신 opt_in. 자동갱신은 *갱신 직전 별도 동의 요구* 여부로 판정". 예시 보강.
+
+6. **다중 문서 결합 시 over_extraction (TVING 사례)**
+   - **증상**: TVING fixture (서비스+유료 결합) → over_extracted 7개. 모델이 두 문서 사이 cross-doc 추론으로 골든에 없는 답 생성.
+   - **수정 방향**: 결합 fixture에 *문서 경계 마커* 명시 (`<hr><h1>... 유료이용약관</h1>`) — 이미 fixture 빌더에 있음. extract 프롬프트에 "각 마커 이하 본문에서만 인용" 룰 추가.
+
+### 그 외 다음 우선순위
 
 1. **Schema 확장**: ConsentMechanism enum + jurisdiction multi-region 구조 + Codex 추천 신규 필드 (`app_store_billing_dependency`, `dormant_account_policy` 등)
-2. **G config × 5+ runs**: 71.6% 평균의 신뢰도 확정
-3. **다른 fixture 추가**: Tving / Watcha / 쿠팡 Wow 등 (현 인프라로 PDF 또는 HTML 자동 처리 가능)
+2. **G config × 5+ runs**: 71.6% 평균의 신뢰도 확정 (7 서비스 신규 fixture 들도 G config로 재측정 필요)
+3. **다른 fixture 추가**: ~~Tving~~ / ~~쿠팡플레이~~ / ~~Watcha~~ / ~~Disney+~~ (완료) / Apple TV+ / Laftel / Twip 등
 4. **str semantic 임계값 튜닝**: 현재 SequenceMatcher 0.5 — embedding 기반 의미 비교로 업그레이드 가능
 5. **disputes 섹션 prompt 보강**: region-specific 조항 추출하도록
 
