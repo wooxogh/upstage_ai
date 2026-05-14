@@ -25,9 +25,16 @@ UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML,
 
 
 def _get(url: str) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    import gzip
+
+    req = urllib.request.Request(
+        url, headers={"User-Agent": UA, "Accept-Encoding": "gzip"}
+    )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+        body = resp.read()
+        if resp.headers.get("Content-Encoding") == "gzip":
+            body = gzip.decompress(body)
+        return body
 
 
 def fetch_spotify() -> None:
@@ -132,6 +139,113 @@ def _extract_openai_article(html: str, url: str) -> str:
     return m.group(1)
 
 
+def fetch_gemini() -> None:
+    """Google 일반 약관 + 개인정보 + Gemini Apps 추가 약관 결합 (한국어 변형)."""
+    docs = [
+        ("https://policies.google.com/terms?hl=ko", "Google 서비스 약관"),
+        ("https://policies.google.com/privacy?hl=ko", "Google 개인정보처리방침"),
+        ("https://policies.google.com/terms/generative-ai?hl=ko", "Gemini Apps 추가 서비스 약관"),
+    ]
+    body_parts = []
+    total = 0
+    for url, title in docs:
+        html = _get(url).decode("utf-8", errors="ignore")
+        # Google 정책 페이지의 본문 컨테이너 `<div id="main-content" class="vwhFIf">`.
+        # 페이지에 footer/main 클로징 태그가 없어 main-content 이후 trailing script까지 포함.
+        m = re.search(r'<div id="main-content"[^>]*>(.*)</body>', html, re.DOTALL)
+        if not m:
+            raise RuntimeError(f"Gemini: #main-content not found at {url}")
+        article = m.group(1)
+        # 끝부분 script 블록 정리
+        article = re.sub(r"<script[^>]*>.*?</script>", "", article, flags=re.DOTALL)
+        body_parts.append(f"<hr><h1>{title}</h1>\n<p><em>Source: {url}</em></p>\n{article}\n")
+        total += len(article)
+    wrapped = (
+        '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
+        '<title>Google + Gemini Apps 약관</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
+    )
+    out = FIXTURE_DIR / "gemini_terms.html"
+    out.write_text(wrapped, encoding="utf-8")
+    print(f"  → gemini_terms.html ({len(docs)} docs, total {total:,} chars)")
+
+
+def fetch_upstage() -> None:
+    """Upstage 서비스 약관 + 개인정보처리방침 결합."""
+    docs = [
+        ("https://www.upstage.ai/terms-of-service", "Upstage 서비스 이용약관"),
+        ("https://www.upstage.ai/privacy-policy", "Upstage 개인정보처리방침"),
+    ]
+    body_parts = []
+    total = 0
+    for url, title in docs:
+        html = _get(url).decode("utf-8", errors="ignore")
+        # blog-ko-rich-text 가 여러 개 — KO/EN 탭. 가장 긴 것을 사용 (한국어 본문).
+        matches = re.findall(
+            r'<div class="[^"]*blog-ko-rich-text[^"]*w-richtext[^"]*"[^>]*>(.*?)</div>\s*</div>',
+            html,
+            re.DOTALL,
+        )
+        if not matches:
+            # fallback: 모든 rich-text
+            matches = re.findall(
+                r'<div class="[^"]*w-richtext[^"]*"[^>]*>(.*?)</div>',
+                html,
+                re.DOTALL,
+            )
+        if not matches:
+            raise RuntimeError(f"Upstage: rich-text wrapper not found at {url}")
+        article = max(matches, key=len)
+        body_parts.append(f"<hr><h1>{title}</h1>\n<p><em>Source: {url}</em></p>\n{article}\n")
+        total += len(article)
+    wrapped = (
+        '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
+        '<title>Upstage 이용약관 + 개인정보처리방침</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
+    )
+    out = FIXTURE_DIR / "upstage_terms.html"
+    out.write_text(wrapped, encoding="utf-8")
+    print(f"  → upstage_terms.html ({len(docs)} docs, total {total:,} chars)")
+
+
+def fetch_deepseek() -> None:
+    """DeepSeek 이용약관 + 개인정보보호정책 결합 (cdn.deepseek.com 한국어 호스팅).
+
+    경로는 `/en-US/` 이지만 실제 콘텐츠는 한국어로 서빙됨 (확인됨, 2026-05).
+    """
+    docs = [
+        (
+            "https://cdn.deepseek.com/policies/en-US/deepseek-terms-of-use.html",
+            "DeepSeek 이용약관",
+        ),
+        (
+            "https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html",
+            "DeepSeek 개인정보보호정책",
+        ),
+    ]
+    body_parts = []
+    total = 0
+    for url, title in docs:
+        html = _get(url).decode("utf-8", errors="ignore")
+        m = re.search(r'(<div id="write"[^>]*>.*?</div>)\s*</body>', html, re.DOTALL)
+        if not m:
+            # fallback: div#write 끝 매칭 실패 시 시작부터 body 끝까지
+            m = re.search(r'(<div id="write"[^>]*>.*)', html, re.DOTALL)
+        if not m:
+            raise RuntimeError(f"DeepSeek: #write block not found at {url}")
+        article = m.group(1)
+        body_parts.append(f"<hr><h1>{title}</h1>\n<p><em>Source: {url}</em></p>\n{article}\n")
+        total += len(article)
+    wrapped = (
+        '<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8">'
+        '<title>DeepSeek 이용약관 + 개인정보보호정책</title></head>'
+        f'<body>\n{"".join(body_parts)}\n</body></html>\n'
+    )
+    out = FIXTURE_DIR / "deepseek_terms.html"
+    out.write_text(wrapped, encoding="utf-8")
+    print(f"  → deepseek_terms.html ({len(docs)} docs, total {total:,} chars)")
+
+
 def fetch_gpt() -> None:
     """OpenAI ROW Terms of Use + ROW Privacy Policy 결합.
 
@@ -216,6 +330,15 @@ def main():
     elif service == "gpt":
         print("Fetching OpenAI ROW Terms + Privacy (via Wayback)...")
         fetch_gpt()
+    elif service == "gemini":
+        print("Fetching Google ToS + Privacy + Gemini Apps additional terms...")
+        fetch_gemini()
+    elif service == "upstage":
+        print("Fetching Upstage ToS + Privacy Policy...")
+        fetch_upstage()
+    elif service == "deepseek":
+        print("Fetching DeepSeek ToS + Privacy Policy...")
+        fetch_deepseek()
     elif service == "all":
         print("Fetching Spotify + Wavve...")
         fetch_spotify()

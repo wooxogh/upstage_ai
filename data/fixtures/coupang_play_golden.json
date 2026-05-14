@@ -25,33 +25,33 @@
         "expected": "monthly",
         "model_value": null,
         "model_uncertainty": "confirmed",
-        "source_quote": "패스는 정기결제 서비스로, 해지를 신청하지 않는 한 자동으로 다음 결제 주기에 갱신됩니다.",
+        "source_quote": "",
         "source_page": null,
-        "note": "월 단위 정기결제 기본."
+        "note": "월 단위 정기결제 기본. (원문 인용 오염 제거)"
     },
     "pricing.auto_renewal_enabled": {
         "expected": true,
         "model_value": null,
         "model_uncertainty": "confirmed",
-        "source_quote": "패스는 정기결제 서비스로, 해지를 신청하지 않는 한 자동으로 다음 결제 주기에 갱신됩니다.",
+        "source_quote": "",
         "source_page": null,
-        "note": "유료서비스 이용약관 — 자동결제 명시."
+        "note": "유료서비스 이용약관 — 자동결제 명시. (원문 인용 오염 제거)"
     },
     "pricing.auto_renewal_consent": {
-        "expected": "opt_out_available",
+        "expected": "opt_in_explicit",
         "model_value": null,
         "model_uncertainty": "confirmed",
-        "source_quote": "해지를 신청하지 않는 한 자동으로 다음 결제 주기에 갱신됩니다.",
+        "source_quote": "",
         "source_page": null,
-        "note": ""
+        "note": "동의한다 명시 (원문 인용 오염 제거)"
     },
     "pricing.price_change_notice_days": {
-        "expected": 30,
+        "expected": null,
         "model_value": null,
         "model_uncertainty": "inferred",
         "source_quote": "회사가 약관을 개정할 경우에는 적용 일자 및 개정 사유를 명시해 현행 약관과 함께 사이버몰의 화면에 그 적용일자 7일(다만, 회원에게 불리한 내용으로 변경하는 경우에는 30일) 이전부터 적용일자 전일까지 공지한다",
         "source_page": null,
-        "note": "쿠팡 일반 이용약관 제3조. 불리한 변경(가격 변경 포함) 30일 사전 공지. 일반 변경은 7일."
+        "note": "쿠팡 일반 이용약관 제3조. 30일은 불리한 약관 변경용이며 요금 변경 통지일수 명시 없음."
     },
     "pricing.price_change_notice_channels": {
         "expected": [
@@ -116,15 +116,15 @@
         "expected": "online",
         "model_value": null,
         "model_uncertainty": "confirmed",
-        "source_quote": "자동결제 해지는 설정 > 구독관리 또는 앱스토어 내 구독관리 메뉴를 통해 가능합니다.",
+        "source_quote": "",
         "source_page": null,
-        "note": "유료서비스 이용약관 — 앱/웹 설정 메뉴 자동 해지. Tving과 달리 단일 채널."
+        "note": "유료서비스 이용약관 — 앱/웹 설정 메뉴 자동 해지. Tving과 달리 단일 채널. (오염 제거)"
     },
     "cancellation.method_description": {
         "expected": "설정 > 구독관리 (앱/웹) 또는 앱스토어 구독관리",
         "model_value": null,
         "model_uncertainty": "confirmed",
-        "source_quote": "자동결제 해지는 설정 > 구독관리 또는 앱스토어 내 구독관리 메뉴를 통해 가능합니다.",
+        "source_quote": "",
         "source_page": null,
         "note": ""
     },
@@ -212,12 +212,12 @@
         "note": "쿠팡 일반 약관 제3조. 일반 7일, 불리한 변경 30일. **2025년 쿠팡이 면책 조항 공지 기간을 30→7일 단축한 사례로 여론 악화 → 대표이사 사임까지 이어진 이슈 존재**."
     },
     "terms_changes.user_consent_mechanism": {
-        "expected": "silent_acceptance",
+        "expected": "deemed_agreed",
         "model_value": null,
         "model_uncertainty": "inferred",
         "source_quote": "",
         "source_page": null,
-        "note": "쿠팡 일반 약관 표준 — silent acceptance 조항 존재 추정."
+        "note": "쿠팡 일반 약관 표준 — deemed_agreed 조항 존재 추정."
     },
     "terms_changes.user_right_to_terminate_on_change": {
         "expected": true,
@@ -236,12 +236,12 @@
         "note": "쿠팡 일반 약관 표준 — silent acceptance 추정. 직접 quote 확보 필요."
     },
     "terms_changes.price_change_explicit_consent": {
-        "expected": false,
+        "expected": true,
         "model_value": null,
         "model_uncertainty": "inferred",
         "source_quote": "",
         "source_page": null,
-        "note": "v0.2 신설 필드 — 가격 변경에 대한 별도 명시적 동의 절차 없음. 불리한 변경 30일 사전 공지 + 거부 시 해지권만 보장."
+        "note": "v0.2 신설 필드 — 별도 새로운 동의"
     },
     "data_usage.collected_categories": {
         "expected": null,

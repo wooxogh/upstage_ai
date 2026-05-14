@@ -106,6 +106,12 @@ async def main():
     ap.add_argument("fixtures", nargs="+", help="fixture 이름 (예: toss kakaopay banksalad)")
     ap.add_argument("--out-dir", default="/tmp", help="출력 디렉토리 (기본 /tmp)")
     ap.add_argument("--suffix", default="_parallel_run.json", help="출력 파일 접미사")
+    ap.add_argument(
+        "--start-key",
+        type=int,
+        default=0,
+        help="키 할당 시작 인덱스 (다른 프로세스가 key #1 사용 중이면 1)",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -124,7 +130,7 @@ async def main():
         if not path.exists():
             print(f"ERROR: fixture not found: {path}")
             sys.exit(1)
-        key_idx = i % len(keys)
+        key_idx = (i + args.start_key) % len(keys)
         out_path = out_dir / f"{name}{args.suffix}"
         jobs.append((name, path, keys[key_idx], key_idx, out_path))
 

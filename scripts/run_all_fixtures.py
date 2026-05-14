@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import subprocess
 import sys
@@ -30,7 +31,22 @@ from services.upstage import UpstageClient
 FIXTURE_DIR = ROOT / "data" / "fixtures"
 RESULTS_DIR = ROOT / "data" / "experiments"
 
-FIXTURES = ["netflix", "spotify", "wavve", "coupang_play", "tving", "disney_plus", "watcha"]
+FIXTURES_OTT = ["netflix", "spotify", "wavve", "coupang_play", "tving", "disney_plus", "watcha"]
+FIXTURES_AI = ["claude", "deepseek", "gemini", "gpt", "upstage"]
+FIXTURES_FINTECH = ["banksalad", "kakaopay", "toss"]
+
+# 기본은 OTT 7개. 환경변수 EXTRA_FIXTURES로 ai/fintech/all 지정 가능.
+_extra = os.environ.get("EXTRA_FIXTURES", "").lower()
+if _extra == "all":
+    FIXTURES = FIXTURES_OTT + FIXTURES_AI + FIXTURES_FINTECH
+elif _extra == "ai":
+    FIXTURES = FIXTURES_OTT + FIXTURES_AI
+elif _extra == "fintech":
+    FIXTURES = FIXTURES_OTT + FIXTURES_FINTECH
+elif _extra == "non-ott":
+    FIXTURES = FIXTURES_AI + FIXTURES_FINTECH
+else:
+    FIXTURES = FIXTURES_OTT
 
 
 def _resolve_fixture(name: str) -> Path | None:

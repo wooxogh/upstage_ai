@@ -1,11 +1,12 @@
 # Upstage AI Terms Analysis
 
-한국 OTT/구독 약관 분석 파이프라인. PDF/HTML 약관 1건을 입력받아 **42개 필드 구조화 추출 + 위험 조항 요약 + 인용 근거 검증**까지 종단으로 동작.
+한국 OTT·구독·Fintech 약관 분석 파이프라인. PDF/HTML 약관 1건을 입력받아 **42개 필드 구조화 추출 + 위험 조항 요약 + 인용 근거 검증**까지 종단으로 동작. 현재 10 서비스(OTT 7 + Fintech 3) 골든 라벨링 완료, 한국 사업자 약관 평균 semantic 70% 권역.
 
 ```
 입력 (PDF/HTML)
   ↓ Document Parse (PDF) / 직접 추출 (HTML)
-  ↓ Solar Pro 3 × N=2 voting (구조화 추출)
+  ↓ 도메인 인식 (OTT / Fintech / 기타) — prompt #2
+  ↓ Solar Pro 3 voting (구조화 추출, N=2 default / Fintech N=5)
   ↓ Solar Pro 3 요약 (위험 조항 3-5개)
   ↓ Solar Pro 3 groundedness check (근거 검증)
 출력 JSON { terms, summary, key_clauses, ungrounded_clauses, grounded, timings, usage }
@@ -13,14 +14,33 @@
 
 ---
 
-## 📊 성능 평가 (7 서비스, 사람 라벨 기준)
+## 📋 Scope (적용 범위)
 
-7개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 정확도. **default config = BC (N=2 voting + medium reasoning) + prompt #1 (한국 OTT bool 추론 룰)**, 서비스당 2 runs 평균 (병렬 동시성 3, 총 22.2분):
+이 시스템은 **한국 사업자가 한국 사용자에게 제공하는 한국어 약관**에 최적화. Upstage Solar Pro 3가 한국 강행규정·표준약관 컨텍스트에 강하다는 점을 활용. 범위 외 약관은 *boundary case*로 별도 표기.
+
+**✓ In scope**
+- 한국 법인 운영 OTT: Netflix Korea, Wavve, TVING, Watcha, Coupang Play, Disney+ Korea (※ 본사 글로벌이어도 *한국 법인 별도 운영* + *대한민국 법률 적용*이면 in scope)
+- 한국 fintech: Toss, KakaoPay, BankSalad
+- (계획) 한국 사업자 음악 스트리밍 (멜론, 지니뮤직), 중고거래, 배달 등
+
+**⚠️ Boundary cases (정확도 -10~20%p 예상)**
+- **글로벌 직접 운영** (Spotify AB Sweden 등): 한국 법인 없이 본사가 한국어 번역으로 직접 서비스. USA-style 법적 구조(arbitration True, class_action_waiver True)가 *한국어로 번역되어 이식*되어, 한국 OTT 강행규정 inferred 룰이 부적용. 측정값은 *모델 한계*가 아니라 *스키마-도메인 미스매치*.
+- **영어 only ToS** (글로벌 AI 서비스 ChatGPT/Claude/Midjourney 등): Solar Pro 3 한국어 최적화 모델의 *언어 자체* 한계.
+
+이 경계 분석은 **Upstage Solar Pro 3의 강점 (한국어·한국법 컨텍스트 깊이) 과 한계 (글로벌·USA-style·영어 콘텐츠)** 를 동시에 드러냄. 향후 글로벌 약관 분석이 필요하면 별도 schema family + 영어 모델 분기 필요.
+
+---
+
+## 📊 성능 평가 (7 서비스 OTT + 3 서비스 Fintech, 사람 라벨 기준)
+
+10개 서비스의 약관에 대해 **사람이 수동으로 라벨링한 42개 필드 골든 데이터셋**에 대조한 정확도. **default config = BC (N=2 voting + medium reasoning) + prompt #1 (한국 OTT bool 추론 룰) + prompt #2 (도메인 인식 + fintech 보수적 추출 룰)**.
+
+### OTT (서비스당 2 runs 평균, 병렬 동시성 3, 총 22.2분):
 
 | 서비스 | 형식 | Strict | Semantic | Range | 추출 시간 | 토큰 |
 |---|---|---|---|---|---|---|
 | **Netflix** | PDF | **72.5%** | **79.5%** | 69-76 | 322s | 81K |
-| **Spotify** | HTML | 67.5% | 78.0% | 64-71 | 210s | 89K |
+| **Spotify** ⁶ | HTML | 67.5% | 78.0% | 64-71 | 210s | 89K |
 | **Wavve** ¹ | HTML×2 | 62.5% | 71.0% | 61-64 | 153s | 103K |
 | **Disney+** ⁴ | HTML | 59.0% | 71.0% | 59-59 | 248s | 108K |
 | **TVING** ³ | HTML×2 | 59.0% | 62.5% | 57-61 | 272s | 139K |
@@ -40,8 +60,28 @@
 
 ⁵ Watcha는 SSR이지만 free_trial 50%, liability 33%, str 필드 14%로 평균 하회. prompt #1 적용 전 bool '명시적 부재' 8개 missed였으나 N=2 voting + 한국 OTT 룰 결합으로 +8/+12%p 회복 — 가장 명확한 prompt#1 ROI.
 
+⁶ **Spotify는 boundary case** — Spotify AB(스웨덴) 본사가 한국어 번역으로 직접 서비스, 한국 법인 없음. USA-style `arbitration_required=True`/`class_action_waiver=True` 가 *한국 강행규정 inferred False 룰과 정면 충돌*. semantic 78%는 prompt #1 적용 *덕분이 아니라 적용에도 불구하고* 달성한 수치. 측정 표에는 유지하되 *한국 OTT 평균에서 제외*하면 한국 OTT 6서비스 semantic 평균은 **68.8%** (Spotify 포함 시 67.7%).
+
+### Fintech (서비스당 N=5 voting 2 runs 평균):
+
+| 서비스 | 형식 | Semantic | Range | 비고 |
+|---|---|---|---|---|
+| **BankSalad** ⁹ | HTML×2 | **79%** | 76-83 | PFM + 송금 |
+| **Toss** ⁷ | HTML | 75% | 73-78 | 전자금융거래(PG+송금) |
+| **KakaoPay** ⁸ | HTML×2 | 66% | 59-73 | 서비스+전자금융 결합 |
+| **평균** | — | **73.3%** | — | N=5, variance ±9pp |
+
+⁷ Toss는 비바리퍼블리카 단일 약관(전자금융거래 서비스). 51조 + 부칙. 사례 F (EFTA 패턴 룰) 추가 후 liability 16.7%→66.7%로 +50%p, disputes 0%→100%로 회복. *대표적 prompt #2 (도메인 인식 + fintech 보수적 추출) 수혜 케이스*.
+
+⁸ KakaoPay는 (1) 카카오페이 이용약관 + (2) 전자금융거래 이용약관 두 문서 결합. 결합 fixture에서 *cross-doc over-extraction* 7개로 가장 큰 회귀 요인. data_usage 12.5~25% (개인정보처리방침 외부 위임) 도 평균을 끌어내림.
+
+⁹ BankSalad는 PFM(자산관리) + 송금 결합. 사례 E (소프트 부정 패턴) 가 잘 매칭되어 liability 83.3%, disputes 100% 달성. *현재 시스템이 fintech에서 가장 잘 작동하는 케이스*.
+
 **비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.  
-**현재 갭**: BC + prompt#1 평균 -12 ~ -19%p (semantic 67.7% vs 벤치마크 80%). Netflix·Spotify·Wavve·Disney+ 의 semantic은 71-80%로 벤치마크 근접권. Coupang Play / Watcha 가 평균을 끌어내림.
+**현재 갭**: 
+- OTT (Spotify 제외 한국 6서비스): **68.8%**, 벤치마크 대비 -11.2%p
+- Fintech (N=5): **73.3%**, 벤치마크 대비 -6.7%p
+- Spotify (boundary): 78.0% — 측정값이지만 *스키마 미스매치* 컨텍스트로 해석 필요
 
 ### 필드 타입별 정확도 (3 서비스 기준 — Spotify · Netflix PDF · Wavve)
 
@@ -93,6 +133,21 @@
 - 🚨 `marketing_consent: opt_in_required` — Netflix/Wavve의 opt_out_available 대비 사용자 권리 더 명확
 - 추출 한계: `disputes` 25%·`liability` 33%·str 14% — 결국 같은 패턴 (자유 텍스트 paraphrase + bool 명시적 부재 식별 한계)
 
+**Toss (한국 fintech, 전자금융거래)**
+- 단일 비바리퍼블리카 약관(51조). 약관 자체가 *책임 분배 조항* (회사 vs 이용자 vs 제3자) 위주 — *총량 한도(damages_cap)* 와 혼동되기 쉬움
+- pricing/free_trial 100% — fintech 도메인 부적합 필드가 *모두 null*로 정답 처리 (PG 서비스라 구독 개념 없음)
+- liability description 자유 텍스트 paraphrase 갭으로 -33%p — fintech 공통 패턴
+
+**KakaoPay (한국 fintech, 두 약관 결합)**
+- (1) 카카오페이 이용약관 + (2) 전자금융거래 약관 두 문서 결합 — *Wavve/TVING과 동일한 multi-doc 회귀 패턴*
+- `data_usage` 12.5~25% — 개인정보처리방침이 별도 문서로 분리되어 본문에 정보 없음 (외부 문서 위임 = `not_specified`가 정답)
+- over_extracted 6~7개 (16%): cross-doc 추론으로 골든에 없는 답 발명
+
+**BankSalad (한국 PFM + 송금)**
+- 자산관리(PFM) 무료 + 송금 유료 결합 — *서비스 자체가 무료*라 free_trial/pricing 거의 모두 null이 정답
+- liability `damages_cap_present: True` + 사례 E 소프트 부정 패턴 명시 — 모델이 잘 잡음 (83.3%)
+- *현재 시스템이 fintech에서 가장 잘 작동* — 약관 구조가 한국 표준에 가장 가까움
+
 이러한 cross-service 비교는 소비자가 가입 전 검토 시 즉시 보이는 차별점을 드러냄.
 
 ---
@@ -136,6 +191,38 @@
 | **BC + prompt #1** ⭐ | **Netflix PDF** | **79.7%** (peak 83%) | **+5%p** |
 
 → 한국 OTT 6/7 fixtures에서 bool '명시적 부재' missed가 4-8개 → 0-3개로 회복.
+
+### Round 7: prompt #2 (도메인 인식 + fintech 보수적 추출) + N=5 head-to-head
+
+Fintech 도메인 probe 결과 prompt #1의 "한국 OTT 룰"이 fintech에 잘못 transfer되어 over-inference 발생. `도메인 인식 (OTT/Fintech/기타)` 룰 + 사례 F (EFTA 패턴) 추가.
+
+**Fintech (Toss/KakaoPay/BankSalad, N=5 voting)**
+
+| Config | 평균 | Toss | KakaoPay | BankSalad |
+|---|---|---|---|---|
+| BC + prompt#1 (도메인 미인식) | 68.7% | 71% | 66% | 69% |
+| **BC + prompt#2 + N=5** ⭐ | **73.3%** | 75% | 66% | 79% |
+
+→ Toss `liability` 16.7%→66.7%, `disputes` 0%→100%. BankSalad `liability` 67%→83.3%. KakaoPay는 multi-doc over-extraction 회귀로 +0.
+
+**N=2 vs N=5 head-to-head (OTT 3 서비스, prompt#2 적용)**
+
+| Service | N=2 | N=5 | Δ | 해석 |
+|---|---|---|---|---|
+| Spotify ⁶ | 69% | 80% | +11pp | boundary case — "확실한 True 패턴" 일관 적용 |
+| Wavve | 76% | 61% | **-15pp** | multi-doc 보수적 답이 voting으로 굳어짐 |
+| TVING | 57% | 64% | +7pp | over-extraction 변별력 향상 |
+| **평균** | **67%** | **68%** | **+1pp** | flat — N=5 default 전환 근거 부족 |
+
+→ **N=5는 prompt 룰의 conviction을 *증폭*함**. 룰이 맞으면 잘 따라가지만, 잘못 맞은 룰도 굳어지게 만듦. OTT default는 N=2 유지, **fintech는 N=5 권장** — 도메인별 분기 정책.
+
+### N voting 정책 (현재)
+
+| 도메인 | N | 근거 |
+|---|---|---|
+| **OTT/구독** | **N=2** | Round 1-6 G config 검증. multi-doc(Wavve/TVING/Coupang Play)에서 N=5는 보수적 답 굳힘 회귀 |
+| **Fintech** | **N=5** | Round 7. variance ±21pp→±9pp 안정화 + 평균 +2.3%p. EFTA 패턴 룰 voting 안정성 향상 |
+| **Boundary (Spotify 등)** | N=5 권장 | "확실한 True 패턴" 일관 적용 (단 정확도는 schema 미스매치 영향) |
 
 ### 발견된 counter-intuitive 패턴
 
@@ -244,6 +331,19 @@ uvicorn app.main:app --reload
 
 다중 API 키 (`UPSTAGE_API_KEY_2..4`)를 `.env`에 추가하면 자동으로 라운드로빈 분배 — 키 K개면 동시 fixture 수 ~K× 증가.
 
+### 키당 1 vendor 병렬 측정 (parallel_run.py)
+
+```bash
+# 3개 키가 .env에 있으면 3개 fixture를 동시에 (각자 다른 키로) 실행
+.venv/bin/python scripts/parallel_run.py toss kakaopay banksalad
+
+# Fintech 도메인은 N=5 voting 권장
+EXTRACT_ENSEMBLE_N=5 .venv/bin/python scripts/parallel_run.py toss kakaopay banksalad
+
+# 출력: /tmp/{name}_parallel_run.json
+# 평균 speedup 2.5×, 토큰 사용 동일 (병렬화는 시간만 절약, 토큰 절약 아님)
+```
+
 ### 환경 변수
 - `UPSTAGE_API_KEY` — Upstage 인증 (필수)
 - `UPSTAGE_API_KEY_2..4` — 선택, run_all_fixtures.py 가 자동 분배
@@ -258,8 +358,9 @@ uvicorn app.main:app --reload
 
 | 위치 | 내용 |
 |---|---|
-| `data/fixtures/*_golden.json` | 사람 라벨된 정답 데이터 (Netflix v0.2 50필드, Spotify v1, Wavve v1, Coupang Play v0.2, TVING v0.2, Watcha v0.2, Disney+ v0.2) |
-| `data/fixtures/*_terms.html` | 약관 원본 HTML (Spotify · Wavve · Coupang Play · TVING · Netflix · Watcha · Disney+) — gitignored, [data/fixtures/README.md](data/fixtures/README.md) 참고 |
+| `data/fixtures/*_golden.json` | 사람 라벨된 정답 데이터 (OTT: Netflix v0.2 50필드, Spotify v1, Wavve v1, Coupang Play v0.2, TVING v0.2, Watcha v0.2, Disney+ v0.2 / Fintech: Toss v0.2, KakaoPay v0.2, BankSalad v0.2) |
+| `data/fixtures/*_terms.html` | 약관 원본 HTML (OTT 7개 + Fintech 3개) — gitignored, [data/fixtures/README.md](data/fixtures/README.md) 참고 |
+| `scripts/parallel_run.py` | 키당 1 vendor 병렬 실행 (asyncio.gather + UpstageClient per key, speedup ~2.5×) |
 | `data/fixtures/*_run_baseline.json` | 단일 호출 추출 결과 |
 | `data/experiments/experiments_*.{json,md}` | 23회 실험 raw 데이터 + 자동 리포트 (Round 1-4) |
 | `data/experiments/all_fixtures_*.{json,md}` | 7 fixture × N runs 일괄 측정 raw + 자동 리포트 (Round 5-6) |
@@ -320,10 +421,15 @@ uvicorn app.main:app --reload
 ### 그 외 다음 우선순위
 
 1. **Schema 확장**: ConsentMechanism enum + jurisdiction multi-region 구조 + Codex 추천 신규 필드 (`app_store_billing_dependency`, `dormant_account_policy` 등)
-2. **BC + prompt#1 × 5+ runs**: 현재 7 서비스 평균 60.8% strict / 67.7% semantic 의 신뢰구간 확정 (현재는 N=2 평균이라 ±5%p variance 잔존)
-3. **다른 fixture 추가**: ~~Tving~~ / ~~쿠팡플레이~~ / ~~Watcha~~ / ~~Disney+~~ (완료) / Apple TV+ / Laftel / Twip 등
-4. **str semantic 임계값 튜닝**: 현재 SequenceMatcher 0.4 — embedding 기반 의미 비교 (multilingual-MiniLM)로 업그레이드 가능
-5. **disputes 섹션 prompt 보강**: region-specific 조항 추출하도록 (Spotify의 USA-style 중재 조항 캐치)
+2. **도메인별 N voting 분기 코드화**: 현재 `EXTRACT_ENSEMBLE_N` 단일 환경변수 — 도메인 인식 후 자동 분기 (OTT=2, Fintech=5) 구현 필요. `services/extract.py:24` 의 `ENSEMBLE_N` 을 voting 함수 파라미터로 승격.
+3. **BC + prompt#1 × 5+ runs**: 현재 7 서비스 평균 60.8% strict / 67.7% semantic 의 신뢰구간 확정 (현재는 N=2 평균이라 ±5%p variance 잔존)
+4. **다른 fixture 추가**:
+   - OTT: ~~Tving~~ / ~~쿠팡플레이~~ / ~~Watcha~~ / ~~Disney+~~ (완료) / Apple TV+ / Laftel 등
+   - Fintech: ~~Toss~~ / ~~KakaoPay~~ / ~~BankSalad~~ (완료) / 페이코 / 토스증권 / 핀크 등
+   - **계획**: 한국 사업자 음악 (멜론·지니뮤직), 중고거래 (당근·번개장터), 배달 (배민·쿠팡이츠), AI (뤼튼·노션AI 한국향) — 각각 schema family 신설 필요할 가능성 (probe-first)
+5. **str semantic 임계값 튜닝**: 현재 SequenceMatcher 0.4 — embedding 기반 의미 비교 (multilingual-MiniLM)로 업그레이드 가능
+6. **disputes 섹션 prompt 보강**: region-specific 조항 추출하도록 (Spotify의 USA-style 중재 조항 캐치)
+7. **(보류) Music subscription schema family**: n=1 (Spotify)로는 분리 근거 부족. Apple Music + 멜론 추가 후 재검토. 진짜 분기는 *콘텐츠 종류*가 아니라 *법인 위치 (한국 vs 글로벌 직접 운영)* 였음 — [Boundary cases](#-scope-적용-범위) 참고.
 
 ---
 
