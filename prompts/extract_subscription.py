@@ -84,18 +84,9 @@ SYSTEM_PROMPT = """\
      · `cancellation.method_description`에 "한국 거주자: 가입 후 7일 이내 전액 환불 가능" 명시.
 
    **(LLM-4) 영구 무료 tier — trial 아님**:
-   - 약관에 다음 표현 중 하나라도 등장하면 LLM-4 발동:
-     · "Free tier" / "Free Plan" / "Free account" / "Free version" / "Free Service"
-     · "무료 사용자" / "무료 계정" / "기본 무료" / "Free 플랜"
-     · "Subscription not required" / "Subscription is optional"
-     · "Personal account" (with no payment requirement)
-     · "사용자가 결제하지 않고도 ... 이용할 수 있는 [서비스]"
-   - 예: ChatGPT 무료, Claude.ai 무료, Gemini 기본, DeepSeek 무료, Upstage 무료 console.
+   - 약관에 "Free tier", "무료 사용자", "기본 무료 plan"이 *영구 무료*로 등장 (trial 아님). 예: ChatGPT 무료, Claude.ai 무료, Gemini 기본.
      · `free_trial.offered` = **False, "confirmed"** (citation: 무료 tier 정의 조항)
      · 다른 모든 free_trial 필드 = **not_specified** (False/0 절대 채우지 말 것 — trial 개념 자체가 없음).
-   - **반례 (trial이 *진짜* 있는 경우만 free_trial.offered=True)**:
-     · "14-day free trial", "30일 무료 체험" 같이 *기간 명시 + 자동 유료 전환* 구조만 trial로 인정.
-     · 단순히 free plan + 유료 plan 두 가지 옵션이 있는 건 trial 아님 — free_trial.offered=False.
 
    **(LLM-5) 시간 단위 변환 — days 필드에 hours 직입력 금지**:
    - "24 hours before renewal", "24-hour cancellation window" 등:
@@ -106,20 +97,12 @@ SYSTEM_PROMPT = """\
    **(LLM-6) 영문 boilerplate → 한국 schema 매핑 표 (영문 약관 한정)**:
    - "IN NO EVENT WILL [COMPANY] BE LIABLE FOR ANY INDIRECT/INCIDENTAL/SPECIAL/CONSEQUENTIAL DAMAGES" → `liability.indirect_damages_excluded`=True, "confirmed".
    - "Total aggregate liability ... capped at the greater of fees paid in preceding N months or $X" → `liability.damages_cap_present`=True, "confirmed"; `damages_cap_description`에 영문 그대로 인용; **unfair_clause_flags 에 "면책_손배_제한" 추가**.
-   - "All payments are non-refundable" / "No refunds" / "fees are non-refundable" / "subscription fees are non-refundable" → `cancellation.proration_policy`="no_refund", "confirmed"; `cancellation.penalty_present`=False (환불 거부는 penalty 아님).
-   - "Subscriptions auto-renew" / "automatically renews" → `pricing.auto_renewal_enabled`=True, "confirmed".
+   - "All payments are non-refundable except as required by law" → `cancellation.proration_policy`="no_refund", "confirmed".
+   - "Subscriptions auto-renew" → `pricing.auto_renewal_enabled`=True, "confirmed".
    - "binding arbitration" / "individual arbitration only" / "must be resolved through arbitration" → `disputes.arbitration_required`=True, "confirmed"; **unfair_clause_flags 에 "강제 중재" 추가**.
    - "waive ... class action" / "no class actions" / "individual basis only" → `disputes.class_action_waiver`=True, "confirmed"; **unfair_clause_flags 에 "집단소송 포기" 추가**.
    - "California law / Sweden law / PRC law governs" → `disputes.governing_law`에 *영문 표기 그대로* (예: "California law", "People's Republic of China law"); **한국법 외 외국법이면 unfair_clause_flags 에 "준거법 외국법" 추가**.
    - "[City], [State] state and federal courts" → `disputes.jurisdiction_clause`에 영문 그대로.
-   - **silent acceptance (영문 LLM 약관 자주 등장)**:
-     · "by continuing to use the Service ... accept the changes" → `terms_changes.silent_acceptance_clause`=True, "confirmed"; `user_consent_mechanism`="silent_acceptance"; **unfair_clause_flags 에 "의사표시_의제" 추가**.
-     · "continued use after changes constitutes acceptance" → 동일.
-     · "your continued use of the Services confirms your acceptance" → 동일.
-     · "if you do not agree, stop using the Service" → 동일 (silent acceptance pattern).
-   - **cancellation 채널 (영문 LLM 약관)**:
-     · "via account settings", "through the account dashboard", "in your Account Settings" → `cancellation.method`="online", "confirmed".
-     · "API key revocation", "deactivate via dashboard" → `cancellation.method`="online".
    - **citation.quote는 영문 원문 그대로 (한국어 paraphrase 금지)**. value 자체는 한국어 또는 영문 OK 단 위 표 참고.
 
    **(LLM-7) Disputes 침묵 처리 — OTT 룰 금지**:
