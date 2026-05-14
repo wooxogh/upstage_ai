@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +16,10 @@ from services.upstage import UpstageClient
 CHAT_COMPLETIONS_PATH = "/chat/completions"
 MODEL = "solar-pro3"
 MIN_SCORE = 0.6  # 의역/요약을 허용하는 prompt에 맞춰 threshold 완화
+# verification reasoning_effort. 기본 low (단순 yes/no + score), env로 실험 조절.
+GROUND_REASONING_EFFORT = os.getenv("GROUND_REASONING_EFFORT", "medium")
+# Default: "medium" — 2026-05-15 Round 5 실험에서 low→medium이 +7%p (C avg 73.3%)
+# summarize=high와 결합 시 +8.4%p (BC avg 74.7%, peak 80%)
 
 
 def _normalize(s: str) -> str:
@@ -62,7 +67,7 @@ async def _check_one(
             },
         ],
         "response_format": {"type": "json_object"},
-        "reasoning_effort": "low",
+        "reasoning_effort": GROUND_REASONING_EFFORT,
         "temperature": 0,
     }
     raw = await client.post_json(CHAT_COMPLETIONS_PATH, json=payload)

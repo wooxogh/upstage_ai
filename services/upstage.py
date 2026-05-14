@@ -22,7 +22,7 @@ class UpstageClient:
     MAX_RETRIES = 3
     RETRY_BACKOFF_S = 0.5
 
-    def __init__(self, settings: Settings, timeout_s: float = 180.0):
+    def __init__(self, settings: Settings, timeout_s: float = 300.0):
         self.settings = settings
         self._client = httpx.AsyncClient(
             base_url=settings.upstage_base_url,

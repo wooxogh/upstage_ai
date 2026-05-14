@@ -77,8 +77,9 @@ def main():
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump(template, f, ensure_ascii=False, indent=2)
+    field_count = sum(1 for k in template if k not in ("_meta", "unfair_clause_flags"))
     print(f"Template written to {out_path}")
-    print(f"  - {len(template) - 2} fields to verify (plus unfair_clause_flags)")
+    print(f"  - {field_count} fields to verify (plus unfair_clause_flags)")
     print(f"  - edit each entry's 'expected' to ground truth")
 
 

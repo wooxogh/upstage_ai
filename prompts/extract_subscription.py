@@ -12,6 +12,40 @@ SYSTEM_PROMPT = """\
    - "inferred": 다른 조항이나 일반 관행에서 합리적으로 유추됨 (page + quote 필수, quote는 유추 근거)
    - "ambiguous": 다중 해석 가능 (page + quote 필수)
    - "not_specified": 약관이 침묵 (citation은 null 가능)
+   ⚠️ **명시적 부재 vs 침묵 — 가장 자주 혼동되는 구분**:
+   - 약관이 "X를 제공하지 않습니다", "X는 없습니다", "X는 적용되지 않습니다", "X 의무가 없습니다" 같이
+     **부재/부정을 명시적으로 표현**하면 → value=False (또는 0, [], "") + uncertainty="confirmed" + citation 필수.
+   - "not_specified"는 약관 본문에 그 주제에 대한 언급 자체가 없을 때만 사용.
+   - 예: "위약금이 부과되지 않습니다" → penalty_present=False, "confirmed" (NOT "not_specified")
+   - 예: "보상 의무를 부담하지 않습니다" → service_disruption_compensation=False, "confirmed"
+   - 예: "집단소송에 대해 약관에 언급 없음" → class_action_waiver는 "not_specified"
+   - 예: "본 약관은 집단소송 권리를 제한하지 않습니다" → class_action_waiver=False, "confirmed"
+
+   ⚠️ **한국 OTT 약관에서 일반적으로 적용되지 않는 항목 — 침묵 = False(inferred)**:
+   한국 OTT(Wavve, Tving, Netflix Korea 등) 약관은 한국 강행규정에 의해 다음 항목들이
+   기본적으로 *적용되지 않음*. 본문에 해당 항목을 *적용한다*는 명시적 진술이 없으면
+   `value=False`, `uncertainty="inferred"`, citation은 한국법 적용 조항 또는 분쟁 해결 섹션을 인용.
+   - `disputes.arbitration_required`: "중재", "중재로 해결", "중재 의무" 같은 표현이 없으면 → False, inferred.
+     (한국 강행규정상 의무 중재 조항은 일반적으로 인정 안 됨.)
+   - `disputes.class_action_waiver`: "집단소송 포기", "집단소송 권리 제한" 같은 표현이 없으면 → False, inferred.
+     (한국 집단소송 제도 자체가 제한적이라 명시 부재 = 적용 없음.)
+   - `liability.damages_cap_present`: 손해배상 한도 금액/배수가 본문에 없으면 → False, inferred.
+     (단, "특별한 사정으로 통상적인 범위를 벗어나는 손해는 책임지지 않습니다" 같은 한도 표현이 있으면 True.)
+
+   ⚠️ **별도 정책/문서 참조 패턴 (특히 개인정보·결제·앱마켓)**:
+   - 약관이 "자세한 사항은 [개인정보처리방침/별도 정책/관련 정책]을 참고하시기 바랍니다",
+     "결제 정책은 앱마켓에 따릅니다" 같이 **외부 문서로 위임**하면:
+     → 해당 주제 필드는 **"not_specified"** (이 약관 본문에서는 침묵)
+     → False/[]/0으로 추측해 채우지 말 것. 외부 문서 내용은 inferred 처리 금지.
+   - 예: "개인정보 수집·이용·제공은 별도의 개인정보처리방침에 따릅니다"
+     → data_usage.collected_categories, third_party_sharing, marketing_use 등 모두 **not_specified**
+     → False로 채우면 "이 약관이 명시적으로 부재를 진술했다"는 잘못된 의미가 됨.
+   - 예: "결제 처리는 카카오페이/구글플레이 정책에 따릅니다"
+     → 외부 처리자 이름은 third_party_recipients에 confirmed로 기록 가능하지만,
+        marketing_use, cross_border_transfer 같이 본문에 직접 진술 없는 필드는 not_specified.
+
+   ⚠️ **free_trial 섹션**: 약관에 무료 체험에 대한 언급 자체가 없으면 모든 free_trial 필드 = "not_specified".
+     "현재 Netflix는 한국에서 무료체험 미제공" 같은 명시적 부재가 없다면 False/0으로 추측 금지.
 4. **citation 의무**: value가 null이 아니거나 uncertainty가 "confirmed"/"inferred"/"ambiguous" 면 citation 필수 (page + 원문 quote). quote는 약관 원문에서 직접 발췌한 10~80자 문자열 (변형/요약 금지). 절대 빈 문자열("")이나 "..." placeholder를 quote에 넣지 말 것. bbox/section은 채우지 말 것 — 후처리에서 채워짐.
    pain_point_id는 다음 11개 중 정확히 하나만 사용 (해당 없으면 null):
    - PRE-01 (분량/난이도 압박), PRE-02 (혜택-약관 괴리), PRE-03 (무료체험→자동전환), PRE-04 (개인정보 활용)
@@ -54,11 +88,38 @@ SYSTEM_PROMPT = """\
 판정:
 - cancellation.penalty_present.value = False, uncertainty="confirmed", citation.quote="해지 시 별도의 위약금이 부과되지 않습니다"
 
+## 사례 D — 명시적 부재 (분쟁/면책 영역, 자주 빠뜨림)
+입력 발췌: "본 약관은 강행규정에 반하는 방식으로 소비자의 권리(소송권 포함)를 제한하지 않습니다. 중재 의무는 없습니다."
+판정:
+- disputes.arbitration_required.value = False, uncertainty="confirmed", citation.quote="중재 의무는 없습니다"
+- disputes.class_action_waiver.value = False, uncertainty="confirmed", citation.quote="...소송권 포함...제한하지 않습니다"
+- liability.service_disruption_compensation 약관에 보상 의무 명시 부재 표현이 있으면 동일하게 False/"confirmed"
+
+판단 룰: **"~하지 않습니다", "없습니다", "제한하지 않습니다", "의무가 없습니다"** 등 **부정·부재의 명시적 진술**이 있으면 그 사실 자체가 confirmed 정보. not_specified로 빠지면 안 됨.
+
+## 사례 E — 소프트 부정 (책임 면제/한도 약관, 자주 빠뜨림)
+입력 발췌: "당사는 안정적인 서비스 제공을 위해 노력합니다. 다만, 당사의 책임 없이 서비스 중단이나 오류가 발생할 수 있습니다. 당사는 고의 또는 과실로 인하여 귀하가 입은 손해를 배상하되, 특별한 사정으로 통상적인 범위를 벗어나는 손해는 당사의 고의 또는 중대한 과실을 제외하고는 책임지지 않습니다."
+
+이 짧은 단락 한 곳에서 6개 필드 추출 가능:
+- liability.service_disruption_compensation.value = False, "confirmed" — "책임 없이 서비스 중단이나 오류가 발생할 수 있습니다" ⇒ 보상 의무 부재
+- liability.compensation_description.value = (해당 문장 인용), "confirmed"
+- liability.damages_cap_present.value = True, "confirmed" — "통상적인 범위를 벗어나는 손해는 ... 책임지지 않습니다" ⇒ 손해배상 한도 설정
+- liability.damages_cap_description.value = "특별한 사정으로 통상적인 범위를 벗어나는 손해는...책임지지 않습니다", "confirmed"
+- liability.force_majeure_scope.value = "당사의 책임 없이 발생하는 서비스 중단 및 오류", "confirmed"
+- liability.indirect_damages_excluded.value = True, "confirmed" — "특별한 사정으로 통상적인 범위를 벗어나는 손해" = 간접손해 제외
+
+**소프트 부정 패턴** (잘 못 잡는 표현들 — 발견 시 not_specified 처리 금지):
+- "책임 없이 ... 발생할 수 있습니다" ⇒ 보상/책임 의무 부재 (False)
+- "책임지지 않습니다" / "책임을 부담하지 않습니다" ⇒ 책임 부재 (False)
+- "통상적인 범위를 벗어나는 손해는 ... 책임지지 않습니다" ⇒ 손해배상 한도 + 간접손해 제외 (둘 다 True)
+- "노력합니다" 만으로는 보장 의무 없음을 시사 — 보장 부재로 해석 가능
+
 위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C 판정 기준을 적용하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E 판정 기준을 적용하세요.
+특히 사례 D (명시적 부재) + 사례 E (소프트 부정 — 책임 제한 영역)을 약관 전체에 일관되게 적용하세요.
 
 서비스: {service_name} ({service_provider})
 
