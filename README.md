@@ -106,26 +106,40 @@
 - N=1 (voting 없음), reasoning_effort=medium, temperature=0
 - 코드: `MINIMAL_PROMPT=1 EXTRACT_ENSEMBLE_N=1 .venv/bin/python scripts/run_all_fixtures.py 1 3`
 
-| 도메인 | n | Zero-shot strict | Our system strict | **Δ strict** | Zero-shot sem | Our system sem | **Δ sem** |
+**Variance 안정화**: N=2 측정은 sample noise ±5-13%p 변동이 큼 → **N=5 voting × 2 runs**로 재측정 (variance ±3.2%p로 안정). 최종 결과 표는 N=5 기준.
+
+| 도메인 | n | Zero-shot strict | N=5 우리 시스템 strict | **Δ strict** | Zero-shot sem | N=5 sem | **Δ sem** |
 |---|---|---|---|---|---|---|---|
-| **OTT** | 7 | 54.3% | 64.7% | **+10.4%p** ⭐ | 61.9% | 70.8% | **+8.9%p** ⭐ |
-| Fintech | 3 | 59.7% | 64.3% | +4.7%p | 67.0% | 71.3% | +4.3%p |
-| AI/LLM | 5 | 49.4% | 47.9% | **−1.5%p** ⚠️ | 58.4% | 52.0% | **−6.4%p** ⚠️ |
-| **전체 15** | 15 | **53.7%** | **59.0%** | **+5.3%p** | **61.7%** | **64.6%** | **+2.9%p** |
+| **OTT** | 7 | 54.3% | 60.5% | **+6.2%p** | 61.9% | **68.5%** | **+6.6%p** ⭐ |
+| Fintech | 3 | 59.7% | 63.7% | +4.0%p | 67.0% | 68.8% | +1.8%p |
+| AI/LLM | 5 | 49.4% | 51.1% | +1.7%p | 58.4% | 55.5% | **−2.9%p** ⚠️ |
+| **전체 15** | 15 | **53.7%** | **58.0%** | **+4.3%p** | **61.7%** | **64.2%** | **+2.5%p** |
 
-**측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분 wall clock); our system `data/experiments/all_fixtures_20260515_043002.md` (47.5분, 동일 환경/시점).
+**N=2 vs N=5 variance 안정화 효과**
 
-**핵심 발견 (3 가지)**
+| 도메인 | N=2 avg range | N=5 avg range | 안정화 |
+|---|---|---|---|
+| OTT | ±6.0%p | **±3.3%p** | -45% |
+| Fintech | ±6.0%p | ±3.3%p | -45% |
+| AI/LLM | ±4.2%p | ±3.0%p | -29% |
+| 전체 | ±5.4%p | **±3.2%p** | -41% |
 
-1. **시스템 기여는 도메인 의존적** — 평균 +2.9%p semantic이지만 OTT는 +8.9%p, AI는 −6.4%p. *우리 사례 룰이 OTT에 over-fit*되어 있고, AI에는 *불필요한 가정 주입*.
+**측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분, N=1); N=5 `data/experiments/all_fixtures_20260515_145146.{json,md}` (56.6분, N=5 × 2 runs).
 
-2. **개별 fixture 큰 편차**
-   - 🏆 **Spotify +27.0%p sem** — USA-style 중재 패턴을 LLM-6 영문 매핑이 정확 캐치
-   - 🏆 Wavve +20.0%p — multi-doc 결합 + N=2 voting 큰 기여
-   - ⚠️ **DeepSeek −24.5%p sem** — zero-shot 73 vs ours 48.5. 우리 prompt가 deepseek 약관에 *해롭게* 작용
-   - ⚠️ GPT −8.5%p, Upstage −8.0%p — AI 도메인 회귀 패턴
+**핵심 발견 (4 가지 — N=5 안정화 후 확정)**
 
-3. **AI 도메인 진짜 baseline 더 잘됨** — zero-shot 58.4% semantic vs our 52.0%. 즉 **Solar Pro 3는 AI 약관도 잘 다루는데, 우리 OTT-overfit 룰이 방해**. AI specialization을 진지하게 다루려면 *현재 prompt를 도메인별로 conditional하게 disable* 필요 (Round 9 후보).
+1. **시스템 기여는 OTT 도메인에 집중** — N=5 평균 +2.5%p semantic이지만 OTT만 +6.6%p, Fintech +1.8%p, AI **−2.9%p**. *우리 사례 룰이 OTT에 명백히 fit*되어 있고, AI에는 *오히려 해를 끼침*.
+
+2. **개별 fixture 큰 편차 (N=5 안정화 후)**
+   - 🏆 **Spotify +15.5%p sem** — USA-style 중재 패턴을 LLM-6 영문 매핑이 정확 캐치
+   - 🏆 Wavve +13.0%p — multi-doc 결합 + N=5 voting 안정화
+   - 🏆 Netflix +10.0%p — PDF + Document Parse + 한국 OTT inferred False 룰
+   - ⚠️ **DeepSeek −20.0%p sem** — zero-shot 73 vs ours 53. 우리 prompt가 deepseek 약관에 *해롭게* 작용
+   - ⚠️ GPT −8.5%p, Toss −7.0%p, Coupang Play −5.5%p — AI/Fintech 일부 회귀
+
+3. **AI 도메인 진짜 baseline 더 잘됨** — zero-shot 58.4% semantic vs N=5 우리 시스템 55.5%. **Solar Pro 3는 AI 약관도 잘 다루는데, 우리 OTT-overfit 룰이 방해**. AI specialization을 진지하게 다루려면 *현재 prompt를 도메인별로 conditional하게 disable* 필요 (Round 9 후보).
+
+4. **N=5 voting이 진짜 baseline 측정에 필수** — variance 41% 감소 (±5.4 → ±3.2%p). N=2 측정으로는 noise 때문에 시스템 효과와 분리 불가. *발표 자료 작성 시 N=5 평균 사용*.
 
 **도메인별 다음 과제**: AI 도메인은 prompt minimal로 돌리는 게 더 나음 — `MINIMAL_PROMPT=1` 환경변수 도메인별 분기 또는 prompt 첫 줄에서 *AI 도메인 감지 시 사례 A-F 무시* 룰 추가.
 
