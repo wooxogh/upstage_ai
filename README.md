@@ -126,6 +126,30 @@
 
 **측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분, N=1); N=5 `data/experiments/all_fixtures_20260515_145146.{json,md}` (56.6분, N=5 × 2 runs).
 
+**Round 10 — AI 영문 boilerplate specialized prompt (혼합 결과)**
+
+Round 9 minimal에서 한 단계 더 — `AI_SYSTEM_PROMPT` 신설 (minimal base + LLM-1~6 룰).
+영문 boilerplate 매핑 (binding arbitration, non-refundable, California law 등) 복원.
+
+| Fixture | 언어 | ZS | R9 | R10 | R9→R10 |
+|---|---|---|---|---|---|
+| Claude | 한국어 | 61 | 71 | 63.0 | -8.0 ⚠️ |
+| Gemini | 한국어 | 40 | 50 | 34.0 | -16.0 ⚠️ |
+| Upstage | 한국어 | 54 | 59 | 57.5 | -1.5 |
+| **GPT** | 영문 | 64 | 56.5 | **62.5** | **+6.0** ⭐ |
+| **DeepSeek** | 영문 | 73 | 61.5 | **71.0** | **+9.5** ⭐ |
+| AI 평균 | — | 58.4 | 59.6 | 57.6 | -2.0 |
+
+**핵심 발견 — 언어 분기 필요**
+
+- 영문 AI 약관 (GPT/DeepSeek): R9 → R10 평균 +7.8 ⭐ (의도대로 효과)
+- 한국어 AI 약관 (Claude/Gemini/Upstage): R9 → R10 평균 -8.5 ⚠️
+  영문 boilerplate 룰 prompt 전체가 *영문 약관 가정*이라 한국어 본문도 영문처럼 분석 시도 → 한국어 추출 품질 저하.
+
+→ Round 11 후보 (다음 단계, 별도 repo `upstage_ai_demo`에서 진행): `_detect_language()` 로 영문/한국어 자동 분기. 영문 AI → AI_SYSTEM_PROMPT, 한국어 AI → MINIMAL_SYSTEM_PROMPT. 모든 fixture에서 best 유지 예상 (AI 평균 ~62.7).
+
+---
+
 **Round 9 — AI 도메인 conditional minimal prompt (검증 완료)**
 
 `services/extract.py`의 `_is_ai_domain()` 으로 service_name/본문 keyword 매칭하여 AI 도메인이면 자동으로 minimal prompt 분기. 환경변수 `AUTO_AI_DOMAIN=1` 기본 활성.
