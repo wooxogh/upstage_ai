@@ -96,19 +96,38 @@
 
 ¹³ Gemini fixture는 437KB로 가장 크지만 strict 38%로 가장 낮음 — *fixture 크기 ≠ 추출 정확도*. Google 약관이 *여러 서비스 약관 컴파일*이라 cross-doc 추론 어려움 + 한국어 번역 품질 변동.
 
-**비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.
+### 진짜 baseline — Zero-shot (Solar Pro 3 raw API) vs 우리 시스템
 
-**도메인별 현재 갭 (15 fixture × 2 runs × 3 키 측정)**: 
+> **벤치마크 비교에 대한 disclaimer**: 흔히 인용되는 "Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%"는 *4지선다 객관식*. 우리 task는 42 필드 자유 추출(open-ended, str/list/enum 다양) 이라 직접 비교 부적절. 진짜 비교 기준은 **동일 모델·동일 schema에 우리 prompt/voting/scoring을 *적용 안 한* zero-shot baseline**.
 
-| 도메인 | n | Strict | Semantic | 벤치마크 갭 (sem) |
-|---|---|---|---|---|
-| Fintech | 3 | 64.3% | **71.3%** | **-8.7%p** ⭐ |
-| OTT (한국 6) | 6 | 65.0% | 68.8% | -11.2%p |
-| OTT (Spotify 포함 7) | 7 | 64.7% | 70.8% | -9.2%p |
-| AI/LLM | 5 | **47.9%** | **52.0%** | **-28.0%p** ⚠️ |
-| 전체 평균 | 15 | 60.0% | 67.1% | -12.9%p |
+**Zero-shot 측정 조건**
+- 동일 schema (`response_format=json_schema` 강제, FieldValue 형태)
+- Minimal 시스템 프롬프트 (사례 A-F · 도메인 인식 · LLM-1~6 룰 모두 제거)
+- N=1 (voting 없음), reasoning_effort=medium, temperature=0
+- 코드: `MINIMAL_PROMPT=1 EXTRACT_ENSEMBLE_N=1 .venv/bin/python scripts/run_all_fixtures.py 1 3`
 
-**핵심 발견**: AI 도메인이 -17%p 균일하게 낮음. fixture 크기와 무관 — *도메인 특성*이 결정적. Round 7 specialization 시도 결과는 [실험 결과 정리 섹션](#-실험-결과-정리) 참조.
+| 도메인 | n | Zero-shot strict | Our system strict | **Δ strict** | Zero-shot sem | Our system sem | **Δ sem** |
+|---|---|---|---|---|---|---|---|
+| **OTT** | 7 | 54.3% | 64.7% | **+10.4%p** ⭐ | 61.9% | 70.8% | **+8.9%p** ⭐ |
+| Fintech | 3 | 59.7% | 64.3% | +4.7%p | 67.0% | 71.3% | +4.3%p |
+| AI/LLM | 5 | 49.4% | 47.9% | **−1.5%p** ⚠️ | 58.4% | 52.0% | **−6.4%p** ⚠️ |
+| **전체 15** | 15 | **53.7%** | **59.0%** | **+5.3%p** | **61.7%** | **64.6%** | **+2.9%p** |
+
+**측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분 wall clock); our system `data/experiments/all_fixtures_20260515_043002.md` (47.5분, 동일 환경/시점).
+
+**핵심 발견 (3 가지)**
+
+1. **시스템 기여는 도메인 의존적** — 평균 +2.9%p semantic이지만 OTT는 +8.9%p, AI는 −6.4%p. *우리 사례 룰이 OTT에 over-fit*되어 있고, AI에는 *불필요한 가정 주입*.
+
+2. **개별 fixture 큰 편차**
+   - 🏆 **Spotify +27.0%p sem** — USA-style 중재 패턴을 LLM-6 영문 매핑이 정확 캐치
+   - 🏆 Wavve +20.0%p — multi-doc 결합 + N=2 voting 큰 기여
+   - ⚠️ **DeepSeek −24.5%p sem** — zero-shot 73 vs ours 48.5. 우리 prompt가 deepseek 약관에 *해롭게* 작용
+   - ⚠️ GPT −8.5%p, Upstage −8.0%p — AI 도메인 회귀 패턴
+
+3. **AI 도메인 진짜 baseline 더 잘됨** — zero-shot 58.4% semantic vs our 52.0%. 즉 **Solar Pro 3는 AI 약관도 잘 다루는데, 우리 OTT-overfit 룰이 방해**. AI specialization을 진지하게 다루려면 *현재 prompt를 도메인별로 conditional하게 disable* 필요 (Round 9 후보).
+
+**도메인별 다음 과제**: AI 도메인은 prompt minimal로 돌리는 게 더 나음 — `MINIMAL_PROMPT=1` 환경변수 도메인별 분기 또는 prompt 첫 줄에서 *AI 도메인 감지 시 사례 A-F 무시* 룰 추가.
 
 ### 필드 타입별 정확도 (3 서비스 기준 — Spotify · Netflix PDF · Wavve)
 

@@ -7,6 +7,23 @@ from datetime import datetime, timezone
 from pydantic import ValidationError
 
 from prompts.extract_subscription import SYSTEM_PROMPT, USER_PROMPT_TEMPLATE
+
+# Zero-shot baseline용 minimal 시스템 프롬프트 — 사례/도메인 룰 모두 제거.
+# `MINIMAL_PROMPT=1` 환경변수 설정 시 활성화. 평가 목적 (시스템 가치 측정) 외엔 사용 안 함.
+MINIMAL_SYSTEM_PROMPT = """\
+당신은 한국 약관 분석 어시스턴트입니다.
+주어진 약관 본문에서 SubscriptionTerms JSON 스키마의 각 필드를 추출하세요.
+
+규칙:
+1. 모든 필드는 FieldValue 형식 (value, uncertainty, citation) 으로 채웁니다.
+2. value: 약관에 명시된 값. 없거나 모호하면 null.
+3. uncertainty: "confirmed" (명시) / "inferred" (유추) / "ambiguous" / "not_specified".
+4. citation: confirmed/inferred/ambiguous일 때 page + quote 제공 (quote는 본문 원문 발췌).
+5. 응답은 SubscriptionTerms JSON 객체 하나 (response_format=json_schema 강제).
+"""
+
+USE_MINIMAL_PROMPT = os.getenv("MINIMAL_PROMPT", "0") == "1"
+_ACTIVE_SYSTEM_PROMPT = MINIMAL_SYSTEM_PROMPT if USE_MINIMAL_PROMPT else SYSTEM_PROMPT
 from schemas.common import Citation, FieldValue
 from schemas.subscription import SubscriptionTerms
 from services.parse import ParsedElement
@@ -134,7 +151,7 @@ async def extract_subscription(
     payload = {
         "model": MODEL,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": _ACTIVE_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": USER_PROMPT_TEMPLATE.format(
