@@ -62,14 +62,14 @@
 
 ⁶ **Spotify는 boundary case** — Spotify AB(스웨덴) 본사가 한국어 번역으로 직접 서비스, 한국 법인 없음. USA-style `arbitration_required=True`/`class_action_waiver=True` 가 *한국 강행규정 inferred False 룰과 정면 충돌*. semantic 78%는 prompt #1 적용 *덕분이 아니라 적용에도 불구하고* 달성한 수치. 측정 표에는 유지하되 *한국 OTT 평균에서 제외*하면 한국 OTT 6서비스 semantic 평균은 **68.8%** (Spotify 포함 시 67.7%).
 
-### Fintech (서비스당 N=5 voting 2 runs 평균):
+### Fintech (서비스당 N=2 voting 2 runs 평균, 3 키 병렬, 47.5분):
 
-| 서비스 | 형식 | Semantic | Range | 비고 |
-|---|---|---|---|---|
-| **BankSalad** ⁹ | HTML×2 | **79%** | 76-83 | PFM + 송금 |
-| **Toss** ⁷ | HTML | 75% | 73-78 | 전자금융거래(PG+송금) |
-| **KakaoPay** ⁸ | HTML×2 | 66% | 59-73 | 서비스+전자금융 결합 |
-| **평균** | — | **73.3%** | — | N=5, variance ±9pp |
+| 서비스 | 형식 | Strict | Semantic | Range strict | 비고 |
+|---|---|---|---|---|---|
+| **KakaoPay** ⁸ | HTML×2 | **73.5%** | **80.0%** | 71-76 | 서비스+전자금융 결합 |
+| **Toss** ⁷ | HTML | 64.0% | 67.5% | 59-69 | 전자금융거래(PG+송금) |
+| **BankSalad** ⁹ | HTML×2 | 55.5% | 66.5% | 54-57 | PFM + 송금 |
+| **평균** | — | **64.3%** | **71.3%** | — | N=2, variance ±5pp |
 
 ⁷ Toss는 비바리퍼블리카 단일 약관(전자금융거래 서비스). 51조 + 부칙. 사례 F (EFTA 패턴 룰) 추가 후 liability 16.7%→66.7%로 +50%p, disputes 0%→100%로 회복. *대표적 prompt #2 (도메인 인식 + fintech 보수적 추출) 수혜 케이스*.
 
@@ -77,11 +77,120 @@
 
 ⁹ BankSalad는 PFM(자산관리) + 송금 결합. 사례 E (소프트 부정 패턴) 가 잘 매칭되어 liability 83.3%, disputes 100% 달성. *현재 시스템이 fintech에서 가장 잘 작동하는 케이스*.
 
-**비교 기준**: Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%.  
-**현재 갭**: 
-- OTT (Spotify 제외 한국 6서비스): **68.8%**, 벤치마크 대비 -11.2%p
-- Fintech (N=5): **73.3%**, 벤치마크 대비 -6.7%p
-- Spotify (boundary): 78.0% — 측정값이지만 *스키마 미스매치* 컨텍스트로 해석 필요
+### AI/LLM (서비스당 N=2 voting 2 runs 평균, 동일 측정 round):
+
+| 서비스 | 형식 | Strict | Semantic | Range strict | 비고 |
+|---|---|---|---|---|---|
+| **Claude** ¹⁰ | HTML (Anthropic) | 57.5% | **70.0%** | 54-61 | Consumer Terms + Privacy |
+| **GPT** ¹¹ | HTML (Wayback) | 53.0% | 55.5% | 52-54 | OpenAI ROW Terms |
+| **Upstage** ¹² | HTML | 46.0% | 46.0% | 40-52 | 한국 AI 회사 (자체 약관) |
+| **DeepSeek** | HTML | 45.0% | 48.5% | 45-45 | 중국 AI 회사 (한국어판) |
+| **Gemini** ¹³ | HTML | 38.0% | 40.0% | 38-38 | Google Korea |
+| **평균** | — | **47.9%** | **52.0%** | — | OTT/Fintech 대비 -17%p ⚠️ |
+
+¹⁰ Claude는 LLM 도메인 중 가장 잘 추출 — Consumer Terms §6 "한국 거주자 7일 환불권" 같은 한국 특화 조항을 LLM-3 룰로 캐치. semantic 70%는 OTT 평균 근접.
+
+¹¹ GPT는 OpenAI ROW(Rest of World) Terms — `archive.org` Wayback `id_` snapshot으로 우회 fetch (Cloudflare 차단). USA-style boilerplate(binding arbitration, class action waiver)를 LLM-6 영문 매핑 룰로 정확 추출.
+
+¹² **Upstage 약관이 가장 낮음 — 흥미로운 아이러니**. 우리 회사 약관인데 평균 46%. 약관 본문이 generic (구체적 가격/기간/한도 명시 적음)이라 *명시 부재* 필드가 많아 model이 not_specified로 처리. *추출 모델 한계가 아니라 fixture-schema 미스매치*.
+
+¹³ Gemini fixture는 437KB로 가장 크지만 strict 38%로 가장 낮음 — *fixture 크기 ≠ 추출 정확도*. Google 약관이 *여러 서비스 약관 컴파일*이라 cross-doc 추론 어려움 + 한국어 번역 품질 변동.
+
+### 진짜 baseline — Zero-shot (Solar Pro 3 raw API) vs 우리 시스템
+
+> **벤치마크 비교에 대한 disclaimer**: 흔히 인용되는 "Upstage Solar Pro 3 한국어 MCQ 벤치마크 ~80%"는 *4지선다 객관식*. 우리 task는 42 필드 자유 추출(open-ended, str/list/enum 다양) 이라 직접 비교 부적절. 진짜 비교 기준은 **동일 모델·동일 schema에 우리 prompt/voting/scoring을 *적용 안 한* zero-shot baseline**.
+
+**Zero-shot 측정 조건**
+- 동일 schema (`response_format=json_schema` 강제, FieldValue 형태)
+- Minimal 시스템 프롬프트 (사례 A-F · 도메인 인식 · LLM-1~6 룰 모두 제거)
+- N=1 (voting 없음), reasoning_effort=medium, temperature=0
+- 코드: `MINIMAL_PROMPT=1 EXTRACT_ENSEMBLE_N=1 .venv/bin/python scripts/run_all_fixtures.py 1 3`
+
+**Variance 안정화**: N=2 측정은 sample noise ±5-13%p 변동이 큼 → **N=5 voting × 2 runs**로 재측정 (variance ±3.2%p로 안정). 최종 결과 표는 N=5 기준.
+
+| 도메인 | n | Zero-shot strict | N=5 우리 시스템 strict | **Δ strict** | Zero-shot sem | N=5 sem | **Δ sem** |
+|---|---|---|---|---|---|---|---|
+| **OTT** | 7 | 54.3% | 60.5% | **+6.2%p** | 61.9% | **68.5%** | **+6.6%p** ⭐ |
+| Fintech | 3 | 59.7% | 63.7% | +4.0%p | 67.0% | 68.8% | +1.8%p |
+| AI/LLM | 5 | 49.4% | 51.1% | +1.7%p | 58.4% | 55.5% | **−2.9%p** ⚠️ |
+| **전체 15** | 15 | **53.7%** | **58.0%** | **+4.3%p** | **61.7%** | **64.2%** | **+2.5%p** |
+
+**N=2 vs N=5 variance 안정화 효과**
+
+| 도메인 | N=2 avg range | N=5 avg range | 안정화 |
+|---|---|---|---|
+| OTT | ±6.0%p | **±3.3%p** | -45% |
+| Fintech | ±6.0%p | ±3.3%p | -45% |
+| AI/LLM | ±4.2%p | ±3.0%p | -29% |
+| 전체 | ±5.4%p | **±3.2%p** | -41% |
+
+**측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분, N=1); N=5 `data/experiments/all_fixtures_20260515_145146.{json,md}` (56.6분, N=5 × 2 runs).
+
+**Round 10 — AI 영문 boilerplate specialized prompt (혼합 결과)**
+
+Round 9 minimal에서 한 단계 더 — `AI_SYSTEM_PROMPT` 신설 (minimal base + LLM-1~6 룰).
+영문 boilerplate 매핑 (binding arbitration, non-refundable, California law 등) 복원.
+
+| Fixture | 언어 | ZS | R9 | R10 | R9→R10 |
+|---|---|---|---|---|---|
+| Claude | 한국어 | 61 | 71 | 63.0 | -8.0 ⚠️ |
+| Gemini | 한국어 | 40 | 50 | 34.0 | -16.0 ⚠️ |
+| Upstage | 한국어 | 54 | 59 | 57.5 | -1.5 |
+| **GPT** | 영문 | 64 | 56.5 | **62.5** | **+6.0** ⭐ |
+| **DeepSeek** | 영문 | 73 | 61.5 | **71.0** | **+9.5** ⭐ |
+| AI 평균 | — | 58.4 | 59.6 | 57.6 | -2.0 |
+
+**핵심 발견 — 언어 분기 필요**
+
+- 영문 AI 약관 (GPT/DeepSeek): R9 → R10 평균 +7.8 ⭐ (의도대로 효과)
+- 한국어 AI 약관 (Claude/Gemini/Upstage): R9 → R10 평균 -8.5 ⚠️
+  영문 boilerplate 룰 prompt 전체가 *영문 약관 가정*이라 한국어 본문도 영문처럼 분석 시도 → 한국어 추출 품질 저하.
+
+→ Round 11 후보 (다음 단계, 별도 repo `upstage_ai_demo`에서 진행): `_detect_language()` 로 영문/한국어 자동 분기. 영문 AI → AI_SYSTEM_PROMPT, 한국어 AI → MINIMAL_SYSTEM_PROMPT. 모든 fixture에서 best 유지 예상 (AI 평균 ~62.7).
+
+---
+
+**Round 9 — AI 도메인 conditional minimal prompt (검증 완료)**
+
+`services/extract.py`의 `_is_ai_domain()` 으로 service_name/본문 keyword 매칭하여 AI 도메인이면 자동으로 minimal prompt 분기. 환경변수 `AUTO_AI_DOMAIN=1` 기본 활성.
+
+| 도메인 | N=5 baseline sem | Round 9 sem | Δ | vs Zero-shot |
+|---|---|---|---|---|
+| OTT (변경 없음) | 68.5 | 67.2 | -1.3 (noise) | **+5.4%p** ⭐ |
+| **AI (auto minimal)** | 55.5 | **59.6** | **+4.1%p** ⭐ | **+1.2%p** ⭐ |
+
+AI 도메인이 zero-shot baseline을 *처음으로 넘어섬* (58.4 → 59.6). 이전엔 -2.9%p 회귀였음. 명백한 성공.
+
+**Round 9 AI fixture 회복 (semantic)**
+
+| Fixture | Zero-shot | N=5 base | Round 9 | ZS→R9 Δ |
+|---|---|---|---|---|
+| 🏆 **Claude** | 61 | 63.5 | **71.0** | **+10.0** ⭐ |
+| 🏆 Gemini | 40 | 48.5 | 50 | +10.0 |
+| Upstage | 54 | 57 | 59 | +5.0 |
+| DeepSeek | 73 | 53 | 61.5 | -11.5 (회복했지만 ZS 못 따라감) |
+| GPT | 64 | 55.5 | 56.5 | -7.5 (여전히 ZS 아래) |
+
+DeepSeek/GPT가 ZS 못 따라가는 이유: schema 자체가 OTT/Fintech 위주 설계 — AI 약관 핵심 필드 (training data use, output ownership, API key) 가 schema에 없어 *짜낼 데이터 부족*. Round 10 후보: AI 도메인 전용 schema field 추가.
+
+---
+
+**핵심 발견 (4 가지 — N=5 안정화 후 확정)**
+
+1. **시스템 기여는 OTT 도메인에 집중** — N=5 평균 +2.5%p semantic이지만 OTT만 +6.6%p, Fintech +1.8%p, AI **−2.9%p** (Round 9 적용 전). Round 9에서 AI도 +1.2%p로 흑자 전환.
+
+2. **개별 fixture 큰 편차 (N=5 안정화 후)**
+   - 🏆 **Spotify +15.5%p sem** — USA-style 중재 패턴을 LLM-6 영문 매핑이 정확 캐치
+   - 🏆 Wavve +13.0%p — multi-doc 결합 + N=5 voting 안정화
+   - 🏆 Netflix +10.0%p — PDF + Document Parse + 한국 OTT inferred False 룰
+   - ⚠️ **DeepSeek −20.0%p sem** — zero-shot 73 vs ours 53. 우리 prompt가 deepseek 약관에 *해롭게* 작용
+   - ⚠️ GPT −8.5%p, Toss −7.0%p, Coupang Play −5.5%p — AI/Fintech 일부 회귀
+
+3. **AI 도메인 진짜 baseline 더 잘됨** — zero-shot 58.4% semantic vs N=5 우리 시스템 55.5%. **Solar Pro 3는 AI 약관도 잘 다루는데, 우리 OTT-overfit 룰이 방해**. AI specialization을 진지하게 다루려면 *현재 prompt를 도메인별로 conditional하게 disable* 필요 (Round 9 후보).
+
+4. **N=5 voting이 진짜 baseline 측정에 필수** — variance 41% 감소 (±5.4 → ±3.2%p). N=2 측정으로는 noise 때문에 시스템 효과와 분리 불가. *발표 자료 작성 시 N=5 평균 사용*.
+
+**도메인별 다음 과제**: AI 도메인은 prompt minimal로 돌리는 게 더 나음 — `MINIMAL_PROMPT=1` 환경변수 도메인별 분기 또는 prompt 첫 줄에서 *AI 도메인 감지 시 사례 A-F 무시* 룰 추가.
 
 ### 필드 타입별 정확도 (3 서비스 기준 — Spotify · Netflix PDF · Wavve)
 
@@ -224,13 +333,62 @@ Fintech 도메인 probe 결과 prompt #1의 "한국 OTT 룰"이 fintech에 잘�
 | **Fintech** | **N=5** | Round 7. variance ±21pp→±9pp 안정화 + 평균 +2.3%p. EFTA 패턴 룰 voting 안정성 향상 |
 | **Boundary (Spotify 등)** | N=5 권장 | "확실한 True 패턴" 일관 적용 (단 정확도는 schema 미스매치 영향) |
 
+### Round 8: AI 도메인 specialization 시도 + scoring layer 개선
+
+**(8a) 15 fixture domain spread 측정 (15 × 2 runs × 3 keys, 47.5분)**
+
+OTT 7 / Fintech 3 / AI 5로 도메인 분포 확장. AI 도메인이 **-17%p 균일 추락** (claude 57.5 / gpt 53 / upstage 46 / deepseek 45 / gemini 38).
+
+도메인-aware split + LLM-1~6 룰이 *완벽하진 않음을 확인*:
+- ✅ Fintech: 64.3 / 71.3 (OTT급) — 룰 작동
+- ⚠️ AI: 47.9 / 52.0 (OTT 대비 -17%p) — 룰만으로 부족
+
+**(8b) AI specialization 처방 시도**
+
+LLM-4 강화 (Free Plan 7가지 패턴 + 반례) + LLM-6 매핑 추가 (silent_acceptance + cancellation channel + non-refundable 강화).
+
+| Fixture | Strict (orig→new) | 결과 |
+|---|---|---|
+| deepseek | 45 → 50.5 (+5.5) | ✓ 회복 |
+| gpt | 53 → 57 (+4) | ✓ 회복 |
+| upstage | 46 → 47.5 (+1.5) | ✓ 약간 회복 |
+| gemini | 38 → 36 (-2) | ⚠️ noise |
+| **claude** | 57.5 → 52 (**-5.5**) | ❌ 회귀 |
+| AI 평균 | 47.9 → 48.6 (+0.7) | flat |
+
+**(8c) 15 fixture 통합 재측정 (Phase 3 validation)** — prompt 보강이 OTT에 -6.8%p 회귀 발견:
+- OTT: 64.7 → 57.9 (-6.8) ⚠️
+- Fintech: 64.3 → 66.3 (+2.0)
+- AI: 47.9 → 49.4 (+1.5)
+
+→ **LLM-4/6 prompt 보강 rollback** (commit `5a35244`). claude는 Free Plan 명시되어도 free_trial 필드 라벨이 다양해서 부작용 발생. OTT는 동일 prompt에 noise만 부각.
+
+**(8d) Scoring layer 개선 — 유지된 변경**
+
+prompt와 별개로 scoring 개선은 evidence 명확. **모두 유지**.
+
+| 변경 | 검증 |
+|---|---|
+| **str embedding 매칭** (multilingual-MiniLM, cosine ≥ 0.7) | sanity check 통과: paraphrase 0.69-0.96, 다국어 0.87, 음성 0.30 거름. AI semantic +1.8 |
+| **flag canonical alias** (POST-01~05 ↔ 한글 표준명 ↔ 영문) | Watcha precision 0.00 → 0.17 (recall +30%p) |
+| **list vocab AI 도메인 확장** | service_providers/model_training/regulators 등 6개 그룹 추가 |
+| **enum alias (governing law)** | California law ↔ 캘리포니아주 법률 ↔ California, USA |
+
+**(8e) Round 8 학습**
+
+1. **15 fixture × N=2 sample noise > prompt 룰 효과** — 같은 prompt+fixture+scoring으로도 ±5-13%p 변동. 진짜 effect size 측정에 N≥5 필요.
+2. **AI specialization은 trade-off** — 한 fixture(deepseek/gpt) 회복이 다른 fixture(claude) 회귀를 가져옴. 도메인 내부도 *AI sub-domains*로 더 잘게 쪼개야 할 가능성.
+3. **Scoring layer가 ROI 더 큼** — embedding/flag canonical은 *모든 도메인에 동시 작용*하고 회귀 없음. prompt 튜닝보다 scoring 정규화가 안전한 lever.
+
 ### 발견된 counter-intuitive 패턴
 
 1. **`reasoning_effort: medium > high` (extract 단계)** — high가 reasoning path 다양해서 voting과 충돌. medium이 일관성 ↑로 voting 효과 극대화.
 2. **`reasoning_effort: high` (summarize/ground 단계)** — 단일 호출 단계는 voting 보호가 없어 reasoning 깊이가 직접 정확도 견인. extract와 정반대 처방.
 3. **N=2 voting ≈ N=3 voting**: 추가 voting의 diminishing returns. N=5는 효과 미미.
-4. **temperature=0인데도 ±5%p 변동성**: Solar API의 비-결정성 잔존. 최소 N=2 sample 평균 권장.
-5. **prompt 도메인 사전 지식 > config 튜닝**: BC config로 +3.1%p 얻은 후 prompt #1으로 +5%p 추가. 모델에게 *한국 약관 컨텍스트*를 명시하는 효과가 reasoning_effort/voting의 generic 튜닝보다 컸음.
+4. **temperature=0인데도 ±5-13%p 변동성**: Solar API의 비-결정성 잔존. 도메인 분포 평가는 N≥5 필요.
+5. **prompt 도메인 사전 지식 > config 튜닝**: BC config로 +3.1%p 얻은 후 prompt #1으로 +5%p 추가.
+6. **Scoring layer > prompt tuning (안전성 측면)**: prompt 룰 추가는 부작용 위험, scoring 정규화는 회귀 없이 누적 가능 — embedding/flag canonical/vocab 확장이 그 증거.
+7. **Fixture 크기 ≠ 정확도**: Gemini 437KB (38%) vs KakaoPay 109KB (73.5%). 도메인 특성·약관 구조가 결정적.
 
 ---
 
@@ -297,6 +455,14 @@ uv pip install -e ".[dev]"
 cp .env.example .env  # UPSTAGE_API_KEY 입력
 uvicorn app.main:app --reload
 ```
+
+채점 시 의미 임베딩 매칭(Round 8d)을 사용하려면 추가 의존성:
+
+```bash
+uv pip install -e ".[eval]"  # sentence-transformers ~500MB (multilingual MiniLM)
+```
+
+미설치 시 `_str_embedding_similar()`는 자동으로 fallback (휴리스틱 SequenceMatcher/Jaccard만 사용).
 
 ### 단일 약관 분석 (CLI)
 

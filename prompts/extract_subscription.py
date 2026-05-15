@@ -28,7 +28,11 @@ SYSTEM_PROMPT = """\
    - **Fintech/전자금융 (결제·송금·PG·PFM)**: "전자금융거래", "선불전자지급수단", "결제대행", "송금", "자산관리"가 등장,
      또는 "전자금융거래법", "여신전문금융업법", "금융위원회" 인용.
      → 아래 "Fintech 보수적 추출" 룰 적용 (OTT inferred 룰 *적용 금지*).
-   - **기타 (전자상거래·중개·플랫폼)**: 위 둘에 해당하지 않음. 한국 강행규정 inferred 룰은 *명시적 단서가 있을 때만* 사용.
+   - **LLM/AI 구독 (Generative AI 서비스, AI 어시스턴트, LLM 챗봇)**: 본문에 "AI 어시스턴트", "Generative AI", "Large Language Model",
+     "model training", "AI 학습", "Inputs and Outputs", "사용자 입력/출력 학습", "ChatGPT", "Claude", "Gemini", "DeepSeek",
+     "API services + Subscription" 등이 등장. 또는 본문 전체가 영문이고 "outputs / training / prompts / model" 키워드 다수.
+     → 아래 "LLM 보수적 추출 + 영문 boilerplate 매핑" 룰 적용 (OTT inferred 룰 *적용 금지*; Fintech 외부위임 룰은 데이터 섹션에 차용).
+   - **기타 (전자상거래·중개·플랫폼)**: 위 셋에 해당하지 않음. 한국 강행규정 inferred 룰은 *명시적 단서가 있을 때만* 사용.
 
    ⚠️ **[OTT 한정] 한국 OTT 약관에서 일반적으로 적용되지 않는 항목 — 침묵 = False(inferred)**:
    *도메인이 OTT로 판정된 경우에만* 다음 inferred 룰을 사용. fintech/기타에는 적용 금지.
@@ -58,6 +62,57 @@ SYSTEM_PROMPT = """\
    - `disputes.class_action_waiver`: "집단소송 포기/제한" 표현이 없으면 → **False, inferred** (한국 집단소송 제한적이라 명시 부재 = 미적용).
    - `disputes.governing_law`: 본문에 "준거법" 조항이 있으면 그대로 추출, 없으면 → **대한민국 법률, inferred** (한국 사업자 fintech 표준).
    - `disputes.jurisdiction_clause`: "관할법원" 조항이 있으면 그대로 추출, 없으면 → **민사소송법상 관할법원, inferred**.
+
+   ⚠️ **[LLM/AI 한정] 보수적 추출 + 영문 boilerplate 매핑**:
+   *도메인이 LLM/AI로 판정된 경우*, 아래 룰 적용. OTT 침묵=False(inferred) 룰 **금지** (영문 LLM 약관은 영미법 개념이 실제로 자주 명시되므로 침묵 인퍼런스가 위험).
+
+   **(LLM-1) 외부 Pricing Page 위임 — 가장 흔한 패턴**:
+   - LLM 약관은 가격을 본문에 거의 명시하지 않고 "Subscription fees are listed on our Model Pricing Page", "see [pricing page]" 같이 외부 위임.
+   - → `pricing.base_price_krw`, `pricing.plan_name` = **not_specified** (False/0 추정 금지).
+   - → `pricing.billing_cycle`은 본문에 "monthly"/"annually"/"매월" 명시되면 추출, 없으면 not_specified.
+
+   **(LLM-2) 학습 데이터 활용 — LLM 핵심 unfair 후보**:
+   - "Inputs and Outputs may be used to improve/train our models", "사용자 입력 학습 활용" 등이 명시되면:
+     · `data_usage.marketing_use` = True, "confirmed" (모델 학습은 마케팅성 2차 활용 범주에 포함시킴)
+     · 옵트아웃 명시 ("unless you opt out", "별도 동의 거부 가능") → `data_usage.marketing_consent` = "opt_out_available"
+     · **unfair_clause_flags 에 "AI 학습 데이터 활용" 추가** (한국어 키워드 필수, 영문 금지).
+
+   **(LLM-3) 한국 거주자 7일 환불권 (Claude consumer terms §6 패턴)**:
+   - "Users in [..., South Korea, ...] have 7-day cancellation rights with full refunds" 같이 *한국 거주자 한정 환불권*이 명시되면:
+     · `cancellation.notice_period_days` = 7, "inferred" (citation: 해당 조항)
+     · `cancellation.proration_policy` = "prorated", "confirmed" (full refund 가능)
+     · `cancellation.method_description`에 "한국 거주자: 가입 후 7일 이내 전액 환불 가능" 명시.
+
+   **(LLM-4) 영구 무료 tier — trial 아님**:
+   - 약관에 "Free tier", "무료 사용자", "기본 무료 plan"이 *영구 무료*로 등장 (trial 아님). 예: ChatGPT 무료, Claude.ai 무료, Gemini 기본.
+     · `free_trial.offered` = **False, "confirmed"** (citation: 무료 tier 정의 조항)
+     · 다른 모든 free_trial 필드 = **not_specified** (False/0 절대 채우지 말 것 — trial 개념 자체가 없음).
+
+   **(LLM-5) 시간 단위 변환 — days 필드에 hours 직입력 금지**:
+   - "24 hours before renewal", "24-hour cancellation window" 등:
+     · days 필드에는 **반올림한 day 단위만** 입력 (24h → 1, 12h → 1, 6h → 0).
+     · 정확한 시간은 `method_description` 또는 `citation.quote`에 명시.
+     · **절대 24를 days 필드에 직접 입력하지 말 것** (24h ≠ 24days — Claude/GPT 베이스라인에서 가장 흔한 오류).
+
+   **(LLM-6) 영문 boilerplate → 한국 schema 매핑 표 (영문 약관 한정)**:
+   - "IN NO EVENT WILL [COMPANY] BE LIABLE FOR ANY INDIRECT/INCIDENTAL/SPECIAL/CONSEQUENTIAL DAMAGES" → `liability.indirect_damages_excluded`=True, "confirmed".
+   - "Total aggregate liability ... capped at the greater of fees paid in preceding N months or $X" → `liability.damages_cap_present`=True, "confirmed"; `damages_cap_description`에 영문 그대로 인용; **unfair_clause_flags 에 "면책_손배_제한" 추가**.
+   - "All payments are non-refundable except as required by law" → `cancellation.proration_policy`="no_refund", "confirmed".
+   - "Subscriptions auto-renew" → `pricing.auto_renewal_enabled`=True, "confirmed".
+   - "binding arbitration" / "individual arbitration only" / "must be resolved through arbitration" → `disputes.arbitration_required`=True, "confirmed"; **unfair_clause_flags 에 "강제 중재" 추가**.
+   - "waive ... class action" / "no class actions" / "individual basis only" → `disputes.class_action_waiver`=True, "confirmed"; **unfair_clause_flags 에 "집단소송 포기" 추가**.
+   - "California law / Sweden law / PRC law governs" → `disputes.governing_law`에 *영문 표기 그대로* (예: "California law", "People's Republic of China law"); **한국법 외 외국법이면 unfair_clause_flags 에 "준거법 외국법" 추가**.
+   - "[City], [State] state and federal courts" → `disputes.jurisdiction_clause`에 영문 그대로.
+   - **citation.quote는 영문 원문 그대로 (한국어 paraphrase 금지)**. value 자체는 한국어 또는 영문 OK 단 위 표 참고.
+
+   **(LLM-7) Disputes 침묵 처리 — OTT 룰 금지**:
+   - 영문 LLM 약관에 "arbitration", "class action" 표현이 *명시적으로 없으면* → **not_specified** (False inferred 금지). 영미 LLM은 실제로 arbitration이 명시될 가능성이 OTT 대비 높아 conservative 처리.
+   - 한국어 LLM 약관 (Upstage, DeepSeek 한국어판 등)도 동일 — 명시 없으면 not_specified.
+
+   **(LLM-8) unfair_clause_flags vocabulary lock (한국어 키워드만)**:
+   - 허용 vocab: `면책_손배_제한`, `의사표시_의제`, `강제 중재`, `집단소송 포기`, `AI 학습 데이터 활용`, `수출통제 제한`, `준거법 외국법`, `중국법 적용`.
+   - pain_point_id는 기존 11개 enum (PRE-01~04, MID-01~02, POST-01~05) 그대로.
+   - **영문 키워드 발명 절대 금지** (예: `broad_indemnity`, `no_refund_for_tier_change`, `class_action_waiver_clause` 같은 ad-hoc 영문 라벨 — Upstage 베이스라인 회귀의 직접 원인). 영문 boilerplate는 위 (LLM-6) 표대로 한국어 키워드로 매핑.
 
    ⚠️ **별도 정책/문서 참조 패턴 (특히 개인정보·결제·앱마켓)**:
    - 약관이 "자세한 사항은 [개인정보처리방침/별도 정책/관련 정책]을 참고하시기 바랍니다",
@@ -158,16 +213,63 @@ SYSTEM_PROMPT = """\
 - *사유 나열* (천재지변·DDOS·해킹 등)이 *force majeure 정의*와 다름. force majeure 면제 조항이 없으면 not_specified.
 - *고의·중과실 책임* 패턴 (전자금융거래법 §9)이 OTT의 "고의 또는 과실로 손해 배상"보다 *좁은 범위* — `compensation_description`에 이 차이를 반영.
 
+## 사례 G — LLM 외부 Pricing Page 위임 (LLM 한정)
+입력 발췌: "Subscription fees applicable to your use of Claude Pro are listed on our Model Pricing Page."
+판정:
+- pricing.base_price_krw = null, uncertainty="not_specified", citation=null (또는 quote에 위 위임 문장).
+- pricing.plan_name = null, "not_specified".
+- pricing.billing_cycle = null, "not_specified" — 본문에 "monthly" 명시 없으면.
+
+## 사례 H — LLM 학습 데이터 활용 (영문 원문)
+입력 발췌: "We may use your Inputs and Outputs to improve and train our models, unless you opt out via the privacy settings."
+판정:
+- data_usage.marketing_use = True, "confirmed", citation.quote="...use your Inputs and Outputs to improve and train our models..."
+- data_usage.marketing_consent = "opt_out_available", "confirmed"
+- unfair_clause_flags 에 **"AI 학습 데이터 활용"** 추가 (한국어).
+
+## 사례 I — 한국 거주자 7일 환불권 (Claude consumer §6 패턴)
+입력 발췌: "Users residing in Brazil, Mexico, South Korea, and Taiwan have a right to cancel within 7 days of subscription and receive a full refund."
+판정:
+- cancellation.notice_period_days = 7, "inferred", citation.quote="...South Korea... 7 days... full refund..."
+- cancellation.proration_policy = "prorated", "confirmed"
+- cancellation.method_description = "한국 거주자: 가입 후 7일 이내 전액 환불 가능", "confirmed"
+
+## 사례 J — 영문 boilerplate 한도+면책 결합 (Claude consumer §11 패턴)
+입력 발췌: "IN NO EVENT WILL WE BE LIABLE FOR ANY DIRECT, INDIRECT, PUNITIVE, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY DAMAGES. Total aggregate liability is capped at the greater of fees paid in the preceding six months or $100."
+판정:
+- liability.indirect_damages_excluded = True, "confirmed", citation.quote="IN NO EVENT WILL WE BE LIABLE FOR ANY ... INDIRECT, ... CONSEQUENTIAL ..."
+- liability.damages_cap_present = True, "confirmed", citation.quote="Total aggregate liability is capped at..."
+- liability.damages_cap_description = "최근 6개월 결제액 또는 $100 중 큰 금액", "confirmed" (한국어 paraphrase OK; quote는 영문 그대로)
+- unfair_clause_flags 에 **"면책_손배_제한"** 추가.
+
+## 사례 K — 시간 단위 변환 (24h ≠ 24days)
+입력 발췌: "You must cancel at least 24 hours before the renewal date to avoid being charged for the next period."
+판정:
+- cancellation.notice_period_days = 1, "inferred" (24h → 1day 반올림)
+- cancellation.method_description = "갱신일 24시간 전까지 해지 (반올림 후 1일)", "confirmed"
+- citation.quote = "You must cancel at least 24 hours before the renewal date..."
+- **금지**: notice_period_days=24 (24시간을 24일로 직역 — 베이스라인의 가장 흔한 오류).
+
+## 사례 L — 외국법 적용 + 강제 중재 + 집단소송 포기 결합 (GPT/OpenAI 패턴)
+입력 발췌: "California law will govern these Terms. Disputes shall be resolved through binding individual arbitration in San Francisco. You waive any right to participate in class actions."
+판정:
+- disputes.governing_law = "California law", "confirmed".
+- disputes.jurisdiction_clause = "San Francisco, California (arbitration)", "confirmed".
+- disputes.arbitration_required = True, "confirmed".
+- disputes.class_action_waiver = True, "confirmed".
+- unfair_clause_flags 에 **"강제 중재"**, **"집단소송 포기"**, **"준거법 외국법"** 3개 모두 추가.
+
 위 사례는 판단 기준 예시일 뿐, 출력에 포함하지 말 것. 본문은 user 메시지로 별도 제공됩니다.
 """
 
 USER_PROMPT_TEMPLATE = """\
-다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E/F 판정 기준을 적용하세요.
+다음 약관 본문을 분석해 SubscriptionTerms JSON을 생성하세요. 시스템 메시지의 사례 A/B/C/D/E/F/G/H/I/J/K/L 판정 기준을 적용하세요.
 
 **작업 흐름**:
-1. 먼저 본문 첫 1~2조항을 보고 **도메인을 판정** (OTT/Fintech/기타) — 시스템 프롬프트의 "도메인 인식" 룰 참고.
-2. 도메인에 맞는 inferred 룰만 적용 (OTT면 OTT 룰, fintech면 보수적 룰).
-3. 사례 D (명시적 부재) + 사례 E (소프트 부정) + 사례 F (fintech EFTA 패턴) 을 약관 전체에 일관되게 적용.
+1. 먼저 본문 첫 1~2조항을 보고 **도메인을 판정** (OTT/Fintech/LLM/기타) — 시스템 프롬프트의 "도메인 인식" 룰 참고.
+2. 도메인에 맞는 inferred 룰만 적용 (OTT면 OTT 룰, fintech면 보수적 룰, LLM이면 LLM-1~8 룰 + 영문 boilerplate 매핑).
+3. 사례 D (명시적 부재) + 사례 E (소프트 부정) + 사례 F (fintech EFTA) + 사례 G~L (LLM 룰) 을 약관 전체에 일관되게 적용.
+4. LLM 도메인 영문 약관: citation.quote는 **영문 원문 그대로**, value는 한국어 또는 표 매핑 결과. unfair_clause_flags는 **한국어 키워드만** (영문 발명 금지).
 
 서비스: {service_name} ({service_provider})
 

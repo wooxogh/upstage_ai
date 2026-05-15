@@ -20,6 +20,10 @@ dev = [
     "ruff>=0.3",
     "mypy>=1.9",
 ]
+# scoring str field 의미 매칭용 — 채점만 사용 (런타임 의존성 아님)
+eval = [
+    "sentence-transformers>=3.0",
+]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

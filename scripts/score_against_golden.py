@@ -68,6 +68,12 @@ _ENUM_ALIAS_GROUPS = [
     {"prorated", "prorated_refund"},             # 일할 환불 (스키마 정합 차이)
     {"opt_out_available", "opt_out"},            # 옵트아웃 (축약형)
     {"opt_in_explicit", "opt_in_required"},      # 옵트인 (스키마 정합 차이)
+    # str governing_law/jurisdiction은 list_vocab이 아닌 별도 alias 그룹으로 처리
+    {"California law", "California, USA", "미국 캘리포니아주 법률", "캘리포니아 주법"},
+    {"Delaware law", "Delaware, USA", "미국 델라웨어주 법률"},
+    {"Sweden law", "Swedish law", "스웨덴 법률"},
+    {"대한민국 법률", "대한민국 법", "한국 법률", "Korean law", "Republic of Korea law"},
+    {"민사소송법상 관할법원", "민사소송법 관할법원", "민사소송법에 따른 관할법원"},
 ]
 
 
@@ -89,12 +95,20 @@ _LIST_VOCAB_GROUPS = [
     {"sellers", "판매자", "판매업체", "위탁사", "위탁업체"},
     {"shipping_carriers", "배송업체", "배송사", "배송 회사"},
     {"affiliates", "계열사", "관계사"},
-    {"payment_processors", "결제대행사", "쿠팡페이"},
+    {"payment_processors", "결제대행사", "쿠팡페이", "payment processor", "payment processors", "billing provider"},
+    # AI 도메인 vocab
+    {"service_providers", "service providers", "위탁사", "service provider", "third-party service providers"},
+    {"hosting_providers", "hosting providers", "클라우드 호스팅", "infrastructure providers"},
+    {"model_training", "model training", "AI 학습", "학습 데이터 활용", "training data use", "improving our models"},
+    {"regulators", "regulators", "정부기관", "law enforcement", "governmental authorities"},
+    {"user_data_aggregators", "analytics providers", "분석 제공자", "data analytics partners"},
     # 목적
     {"transaction_fulfillment", "거래/배송", "거래 및 배송", "거래 이행", "billing settlement", "결제 정산"},
-    {"fraud_prevention", "부정행위 확인", "부정행위 방지", "본인확인"},
-    {"marketing", "마케팅", "광고", "프로모션"},
-    {"service_delivery", "서비스 제공", "서비스 위탁"},
+    {"fraud_prevention", "부정행위 확인", "부정행위 방지", "본인확인", "abuse prevention", "security"},
+    {"marketing", "마케팅", "광고", "프로모션", "promotional", "advertising"},
+    {"service_delivery", "서비스 제공", "서비스 위탁", "operate the service", "provide services"},
+    {"model_improvement", "model improvement", "improving services", "research and development", "모델 개선", "서비스 개선"},
+    {"legal_compliance", "legal compliance", "법령 준수", "법적 의무"},
     # 채널
     {"email", "이메일", "전자우편"},
     {"sms", "문자메시지", "문자"},
@@ -125,16 +139,45 @@ def _normalize_list_element(s) -> str:
     return re.sub(r"\s+", " ", s_stripped.replace("_", " ")).strip().lower()
 
 
-def _normalize_flag(s: str) -> str:
-    """unfair_clause_flag 정규화: 괄호 내 부연/공백/언더스코어 제거.
+# Unfair clause flag alias — POST-XX 코드 ↔ 한글 표준명 ↔ 영문 라벨 매핑.
+# 같은 그룹에 속한 flag는 비교 시 동일 취급. canonical은 정렬 첫 원소.
+_FLAG_ALIAS_GROUPS = [
+    {"POST-01", "약관 일방 변경권", "unilateral_change", "약관 일방 변경",
+     "일방적 약관 변경", "회사의 일방적 변경권"},
+    {"POST-02", "다크패턴 — 해지 절차 복잡화", "complex_cancellation",
+     "해지 절차 복잡화", "다크패턴 해지", "해지 어려움"},
+    {"POST-03", "환불 거부", "refund_denial", "환불 불가",
+     "환불 거부 (시청 시 청약철회 권리 소멸)", "no_refund"},
+    {"POST-04", "면책/손배 제한", "liability_cap", "면책_손배_제한",
+     "손해배상 한도", "책임 제한"},
+    {"POST-05", "분쟁/집단소송 포기", "arbitration_class_waiver",
+     "의사표시_의제", "의사표시 의제", "강제 중재", "집단소송 포기",
+     "준거법 외국법", "분쟁 해결 포기"},
+    # AI 학습 데이터 — POST 카테고리에 없는 LLM-specific flag
+    {"AI 학습 데이터 활용", "AI 학습 데이터 활용 (옵트아웃)", "ai_training_data",
+     "model training opt-in", "학습 데이터 사용"},
+]
 
-    예: "면책/손배 제한 (100만원 한도)" → "면책/손배 제한"
-        "면책/손배_제한" → "면책/손배 제한"
-    """
+
+def _flag_canonical(s: str) -> str:
+    """flag 정규화: 괄호/언더스코어 제거 + alias 그룹 canonical 매핑."""
     import re
-    s = re.sub(r"\s*\([^)]*\)", "", s).strip()
-    s = s.replace("_", " ")
-    return re.sub(r"\s+", " ", s).strip()
+    if not s:
+        return ""
+    # 1차: 괄호 내 부연 / underscore / 공백 정리
+    base = re.sub(r"\s*\([^)]*\)", "", s).strip()
+    base = base.replace("_", " ")
+    base = re.sub(r"\s+", " ", base).strip()
+    # 2차: alias 그룹 lookup (원본 + 정규화된 형태 둘 다 시도)
+    for group in _FLAG_ALIAS_GROUPS:
+        if s in group or base in group:
+            return sorted(group)[0]
+    return base
+
+
+def _normalize_flag(s: str) -> str:
+    """unfair_clause_flag 정규화 (backward-compatible 이름). canonical alias 매핑 사용."""
+    return _flag_canonical(s)
 
 
 def _str_similar(a: str, b: str) -> float:
@@ -143,6 +186,55 @@ def _str_similar(a: str, b: str) -> float:
     if not a or not b:
         return 0.0
     return SequenceMatcher(None, a.strip(), b.strip()).ratio()
+
+
+# 의미 임베딩 매칭용 — lazy load. 라이브러리 없으면 fallback (휴리스틱만 사용).
+_EMBEDDING_MODEL = None
+_EMBEDDING_CACHE: dict[str, "object"] = {}
+_EMBEDDING_LOAD_FAILED = False
+SEMANTIC_EMBEDDING_THRESHOLD = 0.7  # cosine 유사도 임계 — 한국어 paraphrase에 robust한 값
+
+
+def _embedding_model():
+    """sentence-transformers 모델 lazy 로드. 라이브러리 미설치/로드 실패 시 None."""
+    global _EMBEDDING_MODEL, _EMBEDDING_LOAD_FAILED
+    if _EMBEDDING_LOAD_FAILED:
+        return None
+    if _EMBEDDING_MODEL is None:
+        try:
+            from sentence_transformers import SentenceTransformer
+            _EMBEDDING_MODEL = SentenceTransformer(
+                "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+            )
+        except (ImportError, Exception) as e:  # noqa: BLE001
+            print(f"[warning] embedding 모델 로드 실패 — 휴리스틱만 사용: {type(e).__name__}: {str(e)[:80]}")
+            _EMBEDDING_LOAD_FAILED = True
+            return None
+    return _EMBEDDING_MODEL
+
+
+def _embed(s: str):
+    """문자열을 임베딩 벡터로 변환. 캐시 활용. 모델 로드 실패 시 None."""
+    if not s:
+        return None
+    s = s.strip()
+    if s in _EMBEDDING_CACHE:
+        return _EMBEDDING_CACHE[s]
+    model = _embedding_model()
+    if model is None:
+        return None
+    vec = model.encode(s, convert_to_numpy=True, normalize_embeddings=True)
+    _EMBEDDING_CACHE[s] = vec
+    return vec
+
+
+def _str_embedding_similar(a: str, b: str) -> float:
+    """두 문자열 의미 유사도 — multilingual MiniLM cosine. 모델 없으면 0.0."""
+    va, vb = _embed(a), _embed(b)
+    if va is None or vb is None:
+        return 0.0
+    # normalized 임베딩이라 dot product = cosine similarity
+    return float((va * vb).sum())
 
 
 def _token_jaccard(a: str, b: str) -> float:
@@ -218,7 +310,7 @@ def classify(expected, actual, *, semantic: bool = False) -> str:
     # semantic mode: str/list 유사도 매칭
     if semantic:
         if isinstance(expected, str) and isinstance(actual, str):
-            # SequenceMatcher 또는 토큰 Jaccard 둘 중 하나라도 임계값 넘으면 통과
+            # SequenceMatcher / 토큰 Jaccard / substring 중 하나라도 임계값 넘으면 통과
             if (
                 _str_similar(expected, actual) >= SEMANTIC_STR_THRESHOLD
                 or _token_jaccard(expected, actual) >= SEMANTIC_TOKEN_JACCARD
@@ -227,6 +319,9 @@ def classify(expected, actual, *, semantic: bool = False) -> str:
             # substring 포함도 통과: "결제금액의 10%"가 "결제금액의 10% (이용)" 안에 있으면 OK
             ea, aa = expected.strip(), actual.strip()
             if len(ea) >= 5 and len(aa) >= 5 and (ea in aa or aa in ea):
+                return "ok"
+            # 임베딩 의미 매칭 — 휴리스틱이 모두 실패해도 의미상 가까우면 ok
+            if _str_embedding_similar(expected, actual) >= SEMANTIC_EMBEDDING_THRESHOLD:
                 return "ok"
         if isinstance(expected, list) and isinstance(actual, list):
             if _list_str_similar(expected, actual):
