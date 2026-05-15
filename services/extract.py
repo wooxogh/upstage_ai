@@ -23,7 +23,44 @@ MINIMAL_SYSTEM_PROMPT = """\
 """
 
 USE_MINIMAL_PROMPT = os.getenv("MINIMAL_PROMPT", "0") == "1"
-_ACTIVE_SYSTEM_PROMPT = MINIMAL_SYSTEM_PROMPT if USE_MINIMAL_PROMPT else SYSTEM_PROMPT
+# AUTO_AI_DOMAIN: AI 도메인으로 감지되면 자동으로 minimal prompt로 분기.
+# Round 9 발견 — zero-shot이 우리 OTT-overfit 룰보다 AI 도메인에서 더 잘됨 (-2.9%p).
+AUTO_AI_DOMAIN = os.getenv("AUTO_AI_DOMAIN", "1") == "1"
+
+# AI 도메인 keyword: service_name 또는 본문에 존재 시 AI로 판정.
+_AI_NAME_KEYWORDS = {
+    "claude", "anthropic", "gpt", "openai", "chatgpt",
+    "gemini", "google ai", "bard",
+    "deepseek", "upstage", "solar",
+    "perplexity", "mistral", "llama", "midjourney",
+}
+_AI_TEXT_KEYWORDS = (
+    "Generative AI", "Large Language Model", "model training",
+    "AI 어시스턴트", "Inputs and Outputs", "사용자 입력 학습",
+    "training data", "AI 학습 데이터", "프롬프트", "Prompts",
+)
+
+
+def _is_ai_domain(service_name: str, parsed_markdown: str | None = None) -> bool:
+    """AI 도메인 자동 감지 — service_name keyword 우선, 본문 fallback."""
+    name = (service_name or "").lower()
+    if any(kw in name for kw in _AI_NAME_KEYWORDS):
+        return True
+    if parsed_markdown:
+        # 본문에 AI 키워드 2개 이상 등장 시 AI로 판정 (단순 언급 거름)
+        hit = sum(1 for kw in _AI_TEXT_KEYWORDS if kw in parsed_markdown)
+        if hit >= 2:
+            return True
+    return False
+
+
+def _select_system_prompt(service_name: str, parsed_markdown: str | None = None) -> str:
+    """시스템 프롬프트 분기 — MINIMAL_PROMPT 환경변수 > AUTO_AI_DOMAIN 감지 > 기본."""
+    if USE_MINIMAL_PROMPT:
+        return MINIMAL_SYSTEM_PROMPT
+    if AUTO_AI_DOMAIN and _is_ai_domain(service_name, parsed_markdown):
+        return MINIMAL_SYSTEM_PROMPT
+    return SYSTEM_PROMPT
 from schemas.common import Citation, FieldValue
 from schemas.subscription import SubscriptionTerms
 from services.parse import ParsedElement
@@ -151,7 +188,7 @@ async def extract_subscription(
     payload = {
         "model": MODEL,
         "messages": [
-            {"role": "system", "content": _ACTIVE_SYSTEM_PROMPT},
+            {"role": "system", "content": _select_system_prompt(service_name, parsed_markdown)},
             {
                 "role": "user",
                 "content": USER_PROMPT_TEMPLATE.format(

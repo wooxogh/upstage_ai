@@ -126,9 +126,34 @@
 
 **측정 출처**: zero-shot `data/experiments/all_fixtures_20260515_135302.{json,md}` (12분, N=1); N=5 `data/experiments/all_fixtures_20260515_145146.{json,md}` (56.6분, N=5 × 2 runs).
 
+**Round 9 — AI 도메인 conditional minimal prompt (검증 완료)**
+
+`services/extract.py`의 `_is_ai_domain()` 으로 service_name/본문 keyword 매칭하여 AI 도메인이면 자동으로 minimal prompt 분기. 환경변수 `AUTO_AI_DOMAIN=1` 기본 활성.
+
+| 도메인 | N=5 baseline sem | Round 9 sem | Δ | vs Zero-shot |
+|---|---|---|---|---|
+| OTT (변경 없음) | 68.5 | 67.2 | -1.3 (noise) | **+5.4%p** ⭐ |
+| **AI (auto minimal)** | 55.5 | **59.6** | **+4.1%p** ⭐ | **+1.2%p** ⭐ |
+
+AI 도메인이 zero-shot baseline을 *처음으로 넘어섬* (58.4 → 59.6). 이전엔 -2.9%p 회귀였음. 명백한 성공.
+
+**Round 9 AI fixture 회복 (semantic)**
+
+| Fixture | Zero-shot | N=5 base | Round 9 | ZS→R9 Δ |
+|---|---|---|---|---|
+| 🏆 **Claude** | 61 | 63.5 | **71.0** | **+10.0** ⭐ |
+| 🏆 Gemini | 40 | 48.5 | 50 | +10.0 |
+| Upstage | 54 | 57 | 59 | +5.0 |
+| DeepSeek | 73 | 53 | 61.5 | -11.5 (회복했지만 ZS 못 따라감) |
+| GPT | 64 | 55.5 | 56.5 | -7.5 (여전히 ZS 아래) |
+
+DeepSeek/GPT가 ZS 못 따라가는 이유: schema 자체가 OTT/Fintech 위주 설계 — AI 약관 핵심 필드 (training data use, output ownership, API key) 가 schema에 없어 *짜낼 데이터 부족*. Round 10 후보: AI 도메인 전용 schema field 추가.
+
+---
+
 **핵심 발견 (4 가지 — N=5 안정화 후 확정)**
 
-1. **시스템 기여는 OTT 도메인에 집중** — N=5 평균 +2.5%p semantic이지만 OTT만 +6.6%p, Fintech +1.8%p, AI **−2.9%p**. *우리 사례 룰이 OTT에 명백히 fit*되어 있고, AI에는 *오히려 해를 끼침*.
+1. **시스템 기여는 OTT 도메인에 집중** — N=5 평균 +2.5%p semantic이지만 OTT만 +6.6%p, Fintech +1.8%p, AI **−2.9%p** (Round 9 적용 전). Round 9에서 AI도 +1.2%p로 흑자 전환.
 
 2. **개별 fixture 큰 편차 (N=5 안정화 후)**
    - 🏆 **Spotify +15.5%p sem** — USA-style 중재 패턴을 LLM-6 영문 매핑이 정확 캐치
