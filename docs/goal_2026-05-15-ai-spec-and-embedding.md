@@ -1,7 +1,52 @@
 # Goal: AI specialization + str embedding 통합 검증 (2026-05-15)
 
-> 이 파일은 토큰 한계로 세션이 끊겼을 때 작업 재개용 anchor. cron이 fire하면
-> 이 plan을 읽고 이어서 진행.
+> **상태: COMPLETED (2026-05-15 07:54 KST)**
+> 결과 요약은 [완료 요약](#완료-요약-2026-05-15-0754) 섹션 참조.
+
+## 완료 요약 (2026-05-15 07:54)
+
+### 최종 결정
+
+| 변경 | 결정 | 근거 |
+|---|---|---|
+| str embedding (MiniLM, cosine ≥ 0.7) | ✅ 유지 | sanity check 통과, AI semantic +1.8 |
+| flag canonical alias (POST-XX ↔ 한글) | ✅ 유지 | Watcha precision 0.00 → 0.17 |
+| list vocab AI 도메인 확장 | ✅ 유지 | 부작용 없는 정규화 |
+| enum alias (governing law) | ✅ 유지 | str 정규화에만 영향 |
+| LLM-4 강화 (Free Plan 7가지 패턴) | ❌ Rollback | OTT 회귀 + claude -5.5 |
+| LLM-6 매핑 추가 (silent_acceptance 등) | ❌ Rollback | OTT 회귀 의심 |
+
+### 측정 결과 (15 fixture × 2 runs × 3 keys)
+
+- OTT (7): 64.7% / 70.8% (semantic 벤치마크 -9.2%p)
+- Fintech (3): 64.3% / 71.3% (semantic 벤치마크 -8.7%p) ⭐ 가장 잘됨
+- AI (5): 47.9% / 52.0% (semantic 벤치마크 -28%p) ⚠️ 도메인 본질적 갭
+
+### 완료 조건 vs 결과
+
+- ❌ AI 평균 ≥ 55% strict (47.9, 미달) — sample noise 영향
+- ⚠️ 모든 도메인 회귀 없이 +2%p (prompt 보강 회귀로 rollback 결정)
+
+### 핵심 학습
+
+1. **15 fixture × N=2 sample noise > prompt 룰 효과** — 같은 prompt+fixture로 ±5-13%p 변동
+2. **Scoring layer > prompt tuning (안전성 측면)** — embedding/flag canonical은 회귀 없이 누적 가능
+3. **AI specialization은 trade-off** — 한 fixture 회복이 다른 fixture 회귀 가져옴
+
+### 관련 commits
+
+- `5a35244` feat: scoring embedding + flag canonical, rollback LLM-4/LLM-6 prompt boost
+- `68590ba` wip: AI domain specialization (pending measurement)
+
+### 다음 단계 후보 (별도 goal로 진행)
+
+- N=5 runs로 variance 안정화 (~1.5-3시간)
+- AI sub-domain 분리 (Claude/GPT는 글로벌 영문, Upstage/DeepSeek는 한국어판)
+- Coupang Wow 별도 도메인 (전자상거래 구독)
+
+---
+
+## 작업 이력 (Archive)
 
 ## 현재 상태 (2026-05-15 05:07 KST 작성)
 
